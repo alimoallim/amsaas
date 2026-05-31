@@ -1,0 +1,22 @@
+# Laravel
+laravel/vendor/
+laravel/node_modules/
+laravel/.env
+laravel/storage/logs/*
+laravel/storage/framework/*
+laravel/bootstrap/cache/*.php
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -1,0 +1,227 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Models\Building;
+use App\Http\Requests\Api\V1\StoreBuildingRequest;
+use App\Http\Resources\Api\V1\BuildingResource;
+use Illuminate\Http\Request;
+
+class BuildingController extends Controller
+{
+    /*
+    |--------------------------------------------------------------------------
+    | List Buildings
+    |--------------------------------------------------------------------------
+    */
+
+    public function index(Request $request)
+    {
+        $buildings = Building::latest()
+
+            ->paginate(15);
+
+        return BuildingResource::collection(
+            $buildings
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Store Building
+    |--------------------------------------------------------------------------
+    */
+
+    public function store(
+        StoreBuildingRequest $request
+    ) {
+
+        $validated =
+            $request->validated();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Tenant Isolation
+        |--------------------------------------------------------------------------
+        */
+
+        $validated['company_id'] =
+
+            auth()->user()->company_id;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Create Building
+        |--------------------------------------------------------------------------
+        */
+
+        $building = Building::create([
+
+            'company_id' =>
+
+                $validated['company_id'],
+
+            'name' =>
+
+                $validated['name'],
+
+            'code' =>
+
+                $validated['code'] ?? null,
+
+            'type' =>
+
+                $validated['type'] ?? null,
+
+            'address' =>
+
+                $validated['address'] ?? null,
+
+            'city' =>
+
+                $validated['city'] ?? null,
+
+            'country' =>
+
+                $validated['country'] ?? null,
+
+            'timezone' =>
+
+                $validated['timezone'] ?? null,
+
+            'operating_currency' =>
+
+                $validated['operating_currency'],
+
+            'total_floors' =>
+
+                $validated['total_floors'] ?? 0,
+
+            'total_units' =>
+
+                $validated['total_units'] ?? 0,
+
+            'description' =>
+
+                $validated['description'] ?? null,
+
+            'is_active' =>
+
+                $validated['is_active'] ?? true,
+        ]);
+
+        return response()->json([
+
+            'success' => true,
+
+            'message' =>
+
+                'Building created successfully.',
+
+            'data' =>
+
+                new BuildingResource(
+                    $building
+                )
+
+        ], 201);
+    }
+    /*
+|--------------------------------------------------------------------------
+| Update Building
+|--------------------------------------------------------------------------
+*/
+
+public function update(
+    StoreBuildingRequest $request,
+    Building $building
+) {
+
+    $validated =
+        $request->validated();
+
+    $building->update([
+
+        'name' =>
+
+            $validated['name'],
+
+        'code' =>
+
+            $validated['code'] ?? null,
+
+        'type' =>
+
+            $validated['type'] ?? null,
+
+        'address' =>
+
+            $validated['address'] ?? null,
+
+        'city' =>
+
+            $validated['city'] ?? null,
+
+        'country' =>
+
+            $validated['country'] ?? null,
+
+        'timezone' =>
+
+            $validated['timezone'] ?? null,
+
+        'operating_currency' =>
+
+            $validated['operating_currency'],
+
+        'total_floors' =>
+
+            $validated['total_floors'] ?? 0,
+
+        'total_units' =>
+
+            $validated['total_units'] ?? 0,
+
+        'description' =>
+
+            $validated['description'] ?? null,
+
+        'is_active' =>
+
+            $validated['is_active'] ?? true,
+    ]);
+
+    return response()->json([
+
+        'success' => true,
+
+        'message' =>
+
+            'Building updated successfully.',
+
+        'data' => new BuildingResource(
+            $building
+        )
+    ]);
+}
+/*
+|--------------------------------------------------------------------------
+| Show Building
+|--------------------------------------------------------------------------
+*/
+
+public function show(
+    Building $building
+) {
+
+    return response()->json([
+
+        'success' => true,
+
+        'data' => new BuildingResource(
+            $building
+        )
+    ]);
+}
+}
