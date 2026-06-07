@@ -8,3 +8,5 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 Schedule::command('billing:generate-monthly')->monthlyOn(1, '01:00');
+// Runs every hour
+Schedule::command('billing:cleanup')->hourly();

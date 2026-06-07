@@ -17,15 +17,22 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class CompanyController extends Controller
 {
+    use AuthorizesRequests;
+
     /**
-     * List companies
+     * List the authenticated user's company only.
      */
     public function index(): AnonymousResourceCollection
     {
-        $companies = Company::latest()
+        $this->authorize('viewAny', Company::class);
+
+        $companies = Company::query()
+            ->where('id', auth()->user()->company_id)
+            ->latest()
             ->paginate(15);
 
         return CompanyResource::collection(
@@ -75,6 +82,8 @@ class CompanyController extends Controller
         Company $company
     ): CompanyResource
     {
+        $this->authorize('view', $company);
+
         return new CompanyResource(
             $company
         );
@@ -88,6 +97,8 @@ class CompanyController extends Controller
         Company $company
     ): JsonResponse
     {
+        $this->authorize('update', $company);
+
         $data = $request->validated();
 
         // Optional Logo Update
@@ -123,6 +134,8 @@ class CompanyController extends Controller
         Company $company
     ): JsonResponse
     {
+        $this->authorize('delete', $company);
+
         $company->delete();
 
         return response()->json([

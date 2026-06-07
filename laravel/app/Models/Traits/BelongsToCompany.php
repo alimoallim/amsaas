@@ -4,6 +4,7 @@ namespace App\Models\Traits;
 
 use App\Models\Company;
 use App\Models\Scopes\CompanyScope;
+use App\Support\TenantContext;
 
 trait BelongsToCompany
 {
@@ -37,23 +38,21 @@ trait BelongsToCompany
             |--------------------------------------------------------------------------
             */
 
-            if (
-                app()->runningInConsole()
-            ) {
+            if (app()->runningInConsole() && ! app()->runningUnitTests()) {
+                if (empty($model->company_id)) {
+                    $companyId = TenantContext::currentCompanyId();
+
+                    if ($companyId) {
+                        $model->company_id = $companyId;
+                    }
+                }
 
                 return;
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Require authenticated tenant
-            |--------------------------------------------------------------------------
-            */
-
-            if (!auth()->check()) {
-
-    return;
-}
+            if (! auth()->check()) {
+                return;
+            }
 
             /*
             |--------------------------------------------------------------------------

@@ -320,7 +320,7 @@
                   <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                   </svg>
-                  <input v-model="form.installation_date" type="date" class="field-input" />
+                  <ErpDateInput v-model="form.installation_date" input-class="field-input" placeholder="Installation date" />
                 </div>
                 <FieldError :error="errors.installation_date" />
               </div>
@@ -335,7 +335,12 @@
                   <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                   </svg>
-                  <input v-model="form.inspection_due_date" type="date" class="field-input" />
+                  <ErpDateInput
+                    v-model="form.inspection_due_date"
+                    input-class="field-input"
+                    placeholder="Inspection due"
+                    :min="form.installation_date || ''"
+                  />
                 </div>
                 <FieldError :error="errors.inspection_due_date" />
               </div>
@@ -612,6 +617,7 @@
 import { onMounted, reactive, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api'
+import { ErpDateInput } from '@/components/erp'
 
 /* ── Inline sub-component ───────────────────────────────────── */
 const FieldError = {

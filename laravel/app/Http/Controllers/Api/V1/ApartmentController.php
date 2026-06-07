@@ -2,21 +2,23 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Exceptions\BusinessRuleException;
 use App\Http\Controllers\Controller;
-
 use App\Http\Resources\Api\V1\ApartmentResource;
-
 use App\Models\Apartment;
-
+use App\Services\Property\ApartmentInventoryService;
+use App\Services\Property\BuildingPortfolioService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-
 use Illuminate\Support\Facades\DB;
-
 use Illuminate\Validation\Rule;
 
 class ApartmentController extends Controller
 {
+    public function __construct(
+        private readonly BuildingPortfolioService $buildings,
+        private readonly ApartmentInventoryService $inventory,
+    ) {}
     /*
     |--------------------------------------------------------------------------
     | Index
@@ -28,13 +30,14 @@ class ApartmentController extends Controller
     )
     {
         $query = Apartment::query()
-
-            ->with('building')
-
-            ->where(
-                'company_id',
-                $request->user()->company_id
-            );
+            ->with(['building', 'activeLease'])
+            ->withCount([
+                'agreements as blocking_leases_count' => fn ($q) => $q->whereIn(
+                    'status',
+                    ApartmentInventoryService::LEASE_BLOCKING_STATUSES
+                ),
+            ])
+            ->where('company_id', $request->user()->company_id);
 
         /*
         |--------------------------------------------------------------------------
@@ -466,6 +469,11 @@ class ApartmentController extends Controller
             ], 422);
         }
 
+        $this->buildings->assertBuildingBelongsToCompany(
+            $validated['building_id'],
+            $request->user()->company_id,
+        );
+
         DB::beginTransaction();
 
         try {
@@ -482,6 +490,10 @@ class ApartmentController extends Controller
 
                     $request->user()->id,
             ]);
+
+            $this->buildings->syncUnitCount(
+                $apartment->building()->first()
+            );
 
             DB::commit();
 
@@ -734,6 +746,20 @@ class ApartmentController extends Controller
             ],
         ]);
 
+        if (isset($validated['building_id'])) {
+            $this->buildings->assertBuildingBelongsToCompany(
+                $validated['building_id'],
+                $request->user()->company_id,
+            );
+        }
+
+        if (isset($validated['inventory_status'])) {
+            $this->inventory->assertInventoryStatusChangeAllowed(
+                $apartment,
+                $validated['inventory_status'],
+            );
+        }
+
         DB::beginTransaction();
 
         try {
@@ -810,7 +836,15 @@ class ApartmentController extends Controller
 
         try {
 
+            $this->inventory->assertCanDelete($apartment);
+
+            $building = $apartment->building;
+
             $apartment->delete();
+
+            if ($building) {
+                $this->buildings->syncUnitCount($building);
+            }
 
             return response()->json([
 

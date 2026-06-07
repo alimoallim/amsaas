@@ -114,11 +114,8 @@ class MeterController extends Controller
             )
         ) {
 
-            $query->where(
-
-                'building_id',
-
-                $request->building_id
+            $query->forBuilding(
+                $request->string('building_id')->toString()
             );
         }
 
@@ -428,12 +425,10 @@ class MeterController extends Controller
     public function show(
         Meter $meter
     ): JsonResponse {
-/*
         $this->authorize(
             'view',
             $meter
         );
-        */
 
         $meter->load([
 

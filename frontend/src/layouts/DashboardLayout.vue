@@ -93,9 +93,24 @@
 
     </Transition>
 
+    <template v-for="item in group.items" :key="item.to">
+    <span
+      v-if="item.disabled"
+      class="nav-item nav-item--disabled"
+      :title="collapsed ? item.label : (item.disabledHint || item.label)"
+      role="presentation"
+    >
+      <span class="nav-item-icon" v-html="item.icon" />
+      <Transition name="label-fade">
+        <span v-if="!collapsed" class="nav-item-label">{{ item.label }}</span>
+      </Transition>
+      <Transition name="label-fade">
+        <span v-if="!collapsed && item.badge" class="nav-badge nav-badge--muted">{{ item.badge }}</span>
+      </Transition>
+    </span>
+
     <RouterLink
-      v-for="item in group.items"
-      :key="item.to"
+      v-else
       :to="item.to"
       class="nav-item"
       :class="{
@@ -150,6 +165,7 @@
       </span>
 
     </RouterLink>
+    </template>
 
   </div>
 
@@ -311,6 +327,9 @@
   class="
     page-content
     bg-slate-50
+    font-sans
+    antialiased
+    text-slate-800
     text-slate-900
     transition-colors
     duration-300
@@ -348,6 +367,7 @@ import {
   useRoute,
   useRouter
 } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 /* ─── Props ─────────────────────────────────────────────────── */
 const props = defineProps({
@@ -361,6 +381,7 @@ const emit = defineEmits(['logout', 'mark-read'])
 /* ─── Router ─────────────────────────────────────────────────── */
 const route  = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 /* ─── State ──────────────────────────────────────────────────── */
 const collapsed     = ref(false)
@@ -429,8 +450,38 @@ const navGroups = [
     label: 'Finance',
     items: [
       {
+        to: '/charge-types',
+        label: 'Charge Types',
+        badge: null,
+        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h7"/></svg>`
+      },
+      {
+        to: '/charge-models',
+        label: 'Charge Models',
+        badge: null,
+        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`
+      },
+      {
+        to: '/charges/approve',
+        label: 'Approve charges',
+        badge: null,
+        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`
+      },
+      {
+        to: '/charges',
+        label: 'All utility charges',
+        badge: null,
+        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>`
+      },
+      {
         to: '/invoices',
-        label: 'Invoices',
+        label: 'Billing close',
+        badge: null,
+        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>`
+      },
+      {
+        to: '/invoices/monthly',
+        label: 'Monthly invoices',
         badge: null,
         icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`
       },
@@ -469,7 +520,13 @@ const userInitials = computed(() => {
 
 const routeTitles = {
   dashboard: 'Dashboard', buildings: 'Buildings', apartments: 'Apartments',
-  tenants: 'Tenants', invoices: 'Invoices', payments: 'Payments',
+  tenants: 'Tenants', invoices: 'Billing close', payments: 'Payments',
+  'invoices/monthly': 'Monthly invoices',
+  invoicecreate: 'Create invoice',
+  invoiceshow: 'Invoice detail',
+  chargemodels: 'Charge Models', 'charge-models': 'Charge Models',
+  charges: 'Utility Charges',
+  'charge-types': 'Charge Types', chargetypes: 'Charge Types',
   reports: 'Reports', settings: 'Settings'
 }
 
@@ -513,7 +570,11 @@ const toggleTheme = () => {
 }
 
 const goSettings = () => { router.push('/settings'); userMenuOpen.value = false; topbarMenuOpen.value = false }
-const doLogout   = () => emit('logout')
+const doLogout = async () => {
+  await authStore.logout()
+  emit('logout')
+  router.push('/login')
+}
 
 /* ─── Click outside dropdowns ────────────────────────────────── */
 const handleClickOutside = (e) => {
@@ -825,6 +886,15 @@ watch(() => route.path, () => {
 }
 .nav-item:hover { background: rgba(255,255,255,.05); color: var(--sb-text-hov); }
 
+.nav-item--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.nav-badge--muted {
+  background: #f1f5f9;
+  color: #64748b;
+}
 .nav-item--active {
   background: var(--sb-active-bg) !important;
   color: var(--sb-active-tx) !important;

@@ -1,13 +1,19 @@
 <template>
-  <DashboardLayout>
-    <div class="bg-white rounded-3xl p-8 shadow-sm">
-      <h1 class="text-3xl font-bold">
-        Reports
-      </h1>
-    </div>
-  </DashboardLayout>
+  <div class="erp-page">
+    <ErpPanel>
+      <PageHeader
+        eyebrow="Finance"
+        title="Reports"
+        description="Financial and operational reports — coming in a later phase."
+      />
+      <EmptyState
+        title="Reports module"
+        description="Export packs and scheduled reports will appear here."
+      />
+    </ErpPanel>
+  </div>
 </template>
 
 <script setup>
-import DashboardLayout from '@/layouts/DashboardLayout.vue'
+import { PageHeader, ErpPanel, EmptyState } from '@/components/erp'
 </script>

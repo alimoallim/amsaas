@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Traits\BelongsToCompany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,6 +12,7 @@ class BillingItem extends Model
 {
     use HasFactory;
     use SoftDeletes;
+    use BelongsToCompany;
 
     /*
     |--------------------------------------------------------------------------
@@ -217,13 +219,6 @@ class BillingItem extends Model
     |--------------------------------------------------------------------------
     */
 
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(
-            Company::class
-        );
-    }
-
     public function agreement(): BelongsTo
     {
         return $this->belongsTo(
@@ -262,7 +257,8 @@ class BillingItem extends Model
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(
-            Invoice::class
+            MonthlyInvoice::class,
+            'invoice_id'
         );
     }
 

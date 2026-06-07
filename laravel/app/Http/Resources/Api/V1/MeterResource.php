@@ -27,6 +27,18 @@ class MeterResource extends JsonResource
 
                 $this->id,
 
+            'building_id' =>
+
+                $this->building_id,
+
+            'apartment_id' =>
+
+                $this->apartment_id,
+
+            'tenant_id' =>
+
+                $this->tenant_id,
+
             'meter_number' =>
 
                 $this->meter_number,
@@ -217,7 +229,9 @@ class MeterResource extends JsonResource
 
                 'name' =>
 
-                    $this->tenant?->full_name,
+                    $this->tenant?->full_display_name
+
+                    ?? $this->tenant?->display_name,
             ],
 
             /*

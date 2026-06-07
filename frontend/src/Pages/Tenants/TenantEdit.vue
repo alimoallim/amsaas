@@ -217,7 +217,7 @@
 
               <div class="te-field">
                 <label class="te-label">Date of Birth</label>
-                <input v-model="form.date_of_birth" type="date" class="te-input" />
+                <ErpDateInput v-model="form.date_of_birth" input-class="te-input" placeholder="Date of birth" />
               </div>
 
               <div class="te-field te-field--span2">
@@ -833,6 +833,7 @@ import { reactive, ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute, RouterLink } from 'vue-router'
 import api from '../../services/api'
 import DashboardLayout from '../../layouts/DashboardLayout.vue'
+import { ErpDateInput } from '@/components/erp'
 
 const router = useRouter()
 const route  = useRoute()

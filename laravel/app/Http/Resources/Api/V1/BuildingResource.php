@@ -93,6 +93,13 @@ class BuildingResource extends JsonResource
                         'apartments'
                     )
                 ),
+
+            'apartments_count' => $this->whenCounted('apartments'),
+
+            'controls' => [
+                'can_edit' => true,
+                'can_delete' => ($this->apartments_count ?? 0) === 0,
+            ],
         ];
     }
 }

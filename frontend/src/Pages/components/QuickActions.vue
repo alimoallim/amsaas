@@ -26,7 +26,7 @@ import {
 const actions = [
   { label: 'New Tenant', to: '/tenants/create', icon: UserPlusIcon },
   { label: 'New Lease', to: '/leases/create', icon: DocumentPlusIcon },
-  { label: 'Record Payment', to: '/payments/create', icon: CurrencyDollarIcon },
+  { label: 'Billing Ops', to: '/invoices', icon: CurrencyDollarIcon },
   { label: 'Create Invoice', to: '/invoices/create', icon: ReceiptPercentIcon },
   { label: 'Register Meter', to: '/meters/create', icon: CpuChipIcon },
   { label: 'Add Building', to: '/buildings/create', icon: BuildingOffice2Icon },

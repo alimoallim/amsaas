@@ -387,6 +387,7 @@
 import { reactive, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '../../services/api'
+import { useConfirm } from '@/composables/useConfirm'
 import DashboardLayout from '../../layouts/DashboardLayout.vue'
 
 const router = useRouter()
@@ -508,7 +509,13 @@ const submitForm = async () => {
 }
 
 const deleteApartment = async () => {
-  if (!confirm('Are you sure you want to delete this apartment?')) return
+  const { confirm } = useConfirm()
+  const ok = await confirm({
+    title: 'Delete apartment',
+    message: 'Are you sure you want to delete this apartment? This cannot be undone.',
+    confirmLabel: 'Delete',
+  })
+  if (!ok) return
   try {
     await api.delete(`/apartments/${apartmentId}`)
     router.push({ name: 'Apartments' })

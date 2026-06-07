@@ -29,9 +29,9 @@ class TenantResource extends JsonResource
 
                 $this->tenant_type,
 
-            'display_name' =>
+            'display_name' => $this->full_display_name ?: null,
 
-    $this->display_name,
+            'full_display_name' => $this->full_display_name ?: null,
 
             'name' => [
 

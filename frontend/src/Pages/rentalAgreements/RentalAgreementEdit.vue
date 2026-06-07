@@ -3,9 +3,15 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import api from '../../services/api'
-import DashboardLayout from '../../layouts/DashboardLayout.vue'
+import { useConfirm } from '@/composables/useConfirm'
+
 
 import RentalAgreementForm from './RentalAgreementForm.vue'
+import {
+  mapBillingFromApi,
+  buildRentalAgreementPayload,
+  firstFormError,
+} from '@/utils/rentalAgreementBilling'
 
 const route = useRoute()
 
@@ -23,11 +29,14 @@ const loading = ref(false)
 
 const initialLoading = ref(true)
 
-const apartments = ref([])
+const buildings = ref([])
 
 const tenants = ref([])
 
+const initialBuildingId = ref('')
+
 const errors = ref({})
+const pageError = ref('')
 
 const agreement = ref(null)
 
@@ -42,6 +51,7 @@ const form = reactive({
   apartment_id: '',
 
   tenant_id: '',
+  status:'',
 
   start_date: '',
 
@@ -55,21 +65,12 @@ const form = reactive({
 
   payment_due_day: 1,
 
-  includes_water: false,
-
-  includes_electricity: false,
-
-  includes_internet: false,
-
   auto_renew: false,
 
   renewal_notice_days: 30,
 
-  contract_file: null,
-
-  special_terms: '',
-
-  notes: '',
+  rent_charge_model_id: '',
+  recurring_charges: [],
 })
 
 /*
@@ -102,6 +103,9 @@ async function loadAgreement() {
     form.apartment_id =
       data?.apartment?.id ?? ''
 
+    initialBuildingId.value =
+      data?.apartment?.building?.id ?? ''
+
     form.tenant_id =
       data?.tenant?.id ?? ''
 
@@ -119,18 +123,10 @@ async function loadAgreement() {
 
     form.currency =
       data?.financials?.currency ?? 'USD'
+       form.status = data?.status?.value ?? 'draft'
 
     form.payment_due_day =
       data?.financials?.payment_due_day ?? 1
-
-    form.includes_water =
-      data?.utilities?.includes_water ?? false
-
-    form.includes_electricity =
-      data?.utilities?.includes_electricity ?? false
-
-    form.includes_internet =
-      data?.utilities?.includes_internet ?? false
 
     form.auto_renew =
       data?.renewal?.auto_renew ?? false
@@ -138,11 +134,9 @@ async function loadAgreement() {
     form.renewal_notice_days =
       data?.renewal?.renewal_notice_days ?? 30
 
-    form.special_terms =
-      data?.notes?.special_terms ?? ''
-
-    form.notes =
-      data?.notes?.agreement_notes ?? ''
+    const billing = mapBillingFromApi(data?.billing)
+    form.rent_charge_model_id = billing.rent_charge_model_id
+    form.recurring_charges = billing.recurring_charges
 
   } catch (error) {
 
@@ -167,40 +161,13 @@ async function loadDependencies() {
 
   try {
 
-    const [
-
-      apartmentsResponse,
-
-      tenantsResponse,
-
-    ] = await Promise.all([
-
-      api.get('/apartments', {
-
-        params: {
-
-          per_page: 100,
-        },
-      }),
-
-      api.get('/tenants', {
-
-        params: {
-
-          per_page: 100,
-        },
-      }),
+    const [buildingsResponse, tenantsResponse] = await Promise.all([
+      api.get('/buildings', { params: { per_page: 200 } }),
+      api.get('/tenants', { params: { per_page: 100 } }),
     ])
 
-    apartments.value =
-
-      apartmentsResponse?.data?.data
-      ?? []
-
-    tenants.value =
-
-      tenantsResponse?.data?.data
-      ?? []
+    buildings.value = buildingsResponse?.data?.data ?? []
+    tenants.value = tenantsResponse?.data?.data ?? []
 
   } catch (error) {
 
@@ -247,92 +214,56 @@ async function submitForm() {
   loading.value = true
 
   errors.value = {}
+  pageError.value = ''
 
   try {
+    const isActive = agreement.value?.status?.value === 'active'
 
-    const payload = new FormData()
-
-    payload.append(
-      '_method',
-      'PUT'
-    )
-
-    Object.entries(form)
-
-      .forEach(([key, value]) => {
-
-        if (
-
-          value !== null
-          &&
-          value !== undefined
-
-        ) {
-
-          payload.append(
-            key,
-            value
-          )
-        }
-      })
-
-    await api.post(
-
+    await api.put(
       `/rental-agreements/${agreementId}`,
-
-      payload,
-
-      {
-
-        headers: {
-
-          'Content-Type':
-            'multipart/form-data',
-        },
-      }
+      buildRentalAgreementPayload(form, { isActive, forUpdate: true }),
     )
 
-    /*
-    |--------------------------------------------------------------------------
-    | Redirect
-    |--------------------------------------------------------------------------
-    */
-
-    router.push({
-
-      name: 'RentalAgreementIndex',
-    })
-
+    router.push({ name: 'RentalAgreementShow', params: { id: agreementId } })
   } catch (error) {
-
-    /*
-    |--------------------------------------------------------------------------
-    | Validation Errors
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-
-      error.response?.status === 422
-
-    ) {
-
-      errors.value =
-
-        error.response.data.errors
-        ?? {}
-
+    if (error.response?.status === 422) {
+      errors.value = error.response.data.errors ?? {}
+      pageError.value =
+        firstFormError(errors.value)
+        || error.response.data.message
+        || 'Please fix the highlighted fields.'
       return
     }
 
-    console.error(
-      'Failed to update rental agreement:',
-      error
-    )
-
+    pageError.value = error.response?.data?.message || 'Failed to update rental agreement.'
+    console.error('Failed to update rental agreement:', error)
   } finally {
-
     loading.value = false
+  }
+}
+// Add this new function in your <script setup>
+async function activateAgreement() {
+  const { confirm } = useConfirm()
+  const ok = await confirm({
+    title: 'Activate agreement',
+    message: 'Activate this agreement? The contract will be finalized for billing.',
+    confirmLabel: 'Activate',
+    variant: 'primary',
+  })
+  if (!ok) return
+
+  loading.value = true;
+  try {
+    // Call a dedicated endpoint for state change
+    await api.post(`/rental-agreements/${agreementId}/activate`);
+    
+    // Refresh the page data to show the new status
+    await loadAgreement(); 
+  } catch (error) {
+    console.error('Failed to activate agreement:', error);
+    alert('Failed to change status. Please check your permissions.');
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -465,6 +396,14 @@ onMounted(() => {
         </div>
       </div>
 
+      <div
+        v-if="pageError"
+        class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+        role="alert"
+      >
+        {{ pageError }}
+      </div>
+
       <!-- Loading -->
       <div
         v-if="initialLoading"
@@ -485,8 +424,10 @@ onMounted(() => {
   :form="form"
   :errors="errors"
   :loading="loading"
-  :apartments="apartments"
+  :buildings="buildings"
   :tenants="tenants"
+  :initial-building-id="initialBuildingId"
+  :initial-status="agreement?.status?.value ?? ''"
   :mode="agreement?.status?.value === 'terminated'
     ? 'readonly'
     : 'edit'"

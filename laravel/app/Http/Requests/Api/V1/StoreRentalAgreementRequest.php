@@ -2,14 +2,18 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Http\Requests\Api\V1\Concerns\ValidatesAgreementBilling;
 use App\Models\Agreement;
 use App\Models\Apartment;
+use App\Models\Tenant;
+use App\Services\Property\ApartmentInventoryService;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreRentalAgreementRequest extends FormRequest
 {
+    use ValidatesAgreementBilling;
     /*
     |--------------------------------------------------------------------------
     | Authorization
@@ -29,7 +33,7 @@ class StoreRentalAgreementRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        return array_merge([
 
             /*
             |--------------------------------------------------------------------------
@@ -139,7 +143,7 @@ class StoreRentalAgreementRequest extends FormRequest
             |--------------------------------------------------------------------------
             */
 
-            'deposit_amount' => [
+            'security_deposit' => [
 
                 'nullable',
 
@@ -148,13 +152,65 @@ class StoreRentalAgreementRequest extends FormRequest
                 'min:0',
             ],
 
+            'includes_water' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'includes_electricity' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'includes_internet' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'auto_renew' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'renewal_notice_days' => [
+                'nullable',
+                'integer',
+                'min:1',
+                'max:365',
+            ],
+
+            'contract_file' => [
+                'nullable',
+                'file',
+                'mimes:pdf',
+                'max:10240',
+            ],
+
+            'special_terms' => [
+                'nullable',
+                'string',
+            ],
+
             'notes' => [
 
                 'nullable',
 
                 'string',
             ],
-        ];
+
+            'status' => [
+                'nullable',
+                'string',
+                Rule::in([
+                    Agreement::STATUS_DRAFT,
+                    Agreement::STATUS_ACTIVE,
+                    Agreement::STATUS_PENDING_APPROVAL,
+                    Agreement::STATUS_TERMINATED,
+                    Agreement::STATUS_EXPIRED,
+                    'pending',
+                ]),
+            ],
+        ], $this->agreementBillingRules());
     }
 
     /*
@@ -166,6 +222,8 @@ class StoreRentalAgreementRequest extends FormRequest
     public function withValidator(
         $validator
     ): void {
+
+        $this->validateAgreementBillingRows($validator);
 
         $validator->after(
 
@@ -212,8 +270,9 @@ class StoreRentalAgreementRequest extends FormRequest
 
                             Apartment::LISTING_TYPE_RENTAL,
 
-                            'hybrid',
-                        ]
+                            Apartment::LISTING_TYPE_HYBRID,
+                        ],
+                        true
                     )
                 ) {
 
@@ -245,33 +304,24 @@ class StoreRentalAgreementRequest extends FormRequest
                     );
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | Prevent Multiple Active Agreements
-                |--------------------------------------------------------------------------
-                */
+                $inventory = app(ApartmentInventoryService::class);
 
-                $hasActiveAgreement = Agreement::query()
-
-                    ->where(
-                        'apartment_id',
-                        $apartment->id
-                    )
-
-                    ->where(
-                        'status',
-                        Agreement::STATUS_ACTIVE
-                    )
-
-                    ->exists();
-
-                if ($hasActiveAgreement) {
-
+                if ($inventory->hasConflictingLease($apartment)) {
                     $validator->errors()->add(
-
                         'apartment_id',
+                        'This unit already has a draft or active rental agreement.'
+                    );
+                }
 
-                        'Apartment already has an active agreement.'
+                $tenant = Tenant::query()
+                    ->where('id', $this->tenant_id)
+                    ->where('company_id', auth()->user()->company_id)
+                    ->first();
+
+                if ($tenant && $tenant->status === 'blacklisted') {
+                    $validator->errors()->add(
+                        'tenant_id',
+                        'Blacklisted tenants cannot be assigned to rental agreements.'
                     );
                 }
             }
@@ -318,19 +368,50 @@ class StoreRentalAgreementRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
+        $this->normalizeRecurringChargesInput();
 
+        $status = $this->input('status');
+        if ($status === 'pending') {
+            $status = Agreement::STATUS_PENDING_APPROVAL;
+        }
+
+        $this->merge([
+            'status' => filled($status) ? $status : Agreement::STATUS_DRAFT,
             'monthly_rent' =>
 
                 $this->monthly_rent !== null
                     ? trim($this->monthly_rent)
                     : null,
 
-            'deposit_amount' =>
+            'security_deposit' =>
 
-                $this->deposit_amount !== null
-                    ? trim($this->deposit_amount)
+                $this->security_deposit !== null
+                    ? trim($this->security_deposit)
                     : null,
+
+            'auto_renew' =>
+                filter_var(
+                    $this->auto_renew,
+                    FILTER_VALIDATE_BOOLEAN
+                ),
+
+            'includes_water' =>
+                filter_var(
+                    $this->includes_water,
+                    FILTER_VALIDATE_BOOLEAN
+                ),
+
+            'includes_electricity' =>
+                filter_var(
+                    $this->includes_electricity,
+                    FILTER_VALIDATE_BOOLEAN
+                ),
+
+            'includes_internet' =>
+                filter_var(
+                    $this->includes_internet,
+                    FILTER_VALIDATE_BOOLEAN
+                ),
         ]);
     }
 }

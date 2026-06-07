@@ -180,7 +180,7 @@
 
               <div class="tc-field">
                 <label class="tc-label">Date of Birth</label>
-                <input v-model="form.date_of_birth" type="date" class="tc-input" />
+                <ErpDateInput v-model="form.date_of_birth" input-class="tc-input" placeholder="Date of birth" />
               </div>
 
               <div class="tc-field tc-field--span2">
@@ -868,6 +868,7 @@ import { reactive, ref, computed } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import api from '../../services/api'
 import DashboardLayout from '../../layouts/DashboardLayout.vue'
+import { ErpDateInput } from '@/components/erp'
 
 const router  = useRouter()
 const loading = ref(false)
@@ -925,7 +926,7 @@ const submitTenant = async () => {
   errors.value  = {}
   try {
     await api.post('/tenants', { ...form })
-    router.push({ name: 'TenantIndex' })
+    router.push({ name: 'TenantsIndex' })
   } catch (error) {
     console.error(error)
     console.log(error.response?.data)

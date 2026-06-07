@@ -1,0 +1,78 @@
+name: Laravel Tests
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cloud_finops_admin
+          POSTGRES_PASSWORD: SecurePolymerString992#
+          POSTGRES_DB: amsaas_testing
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cloud_finops_admin -d amsaas_testing"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: laravel
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Prepare application
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: amsaas_testing
+          DB_USERNAME: cloud_finops_admin
+          DB_PASSWORD: SecurePolymerString992#
+
+      - name: Run migrations
+        run: php artisan migrate --force
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: amsaas_testing
+          DB_USERNAME: cloud_finops_admin
+          DB_PASSWORD: SecurePolymerString992#
+
+      - name: PHPStan (level 6 + baseline)
+        run: composer analyse
+
+      - name: Run tests
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: amsaas_testing
+          DB_USERNAME: cloud_finops_admin
+          DB_PASSWORD: SecurePolymerString992#
+        run: php artisan test

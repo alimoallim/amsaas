@@ -2,6 +2,8 @@
 
 namespace App\Services\MeterReading;
 
+use App\Support\Money;
+use App\Services\Billing\GenerateChargeService;
 use App\Models\Meter;
 use App\Models\MeterReading;
 use App\Models\User;
@@ -86,6 +88,8 @@ class MeterReadingProcessorService
             |--------------------------------------------------------------------------
             */
 
+            $currentReading = Money::toScale((string) $data['current_reading'], 4);
+
             $consumption =
                 $this->calculateConsumption(
 
@@ -93,7 +97,7 @@ class MeterReadingProcessorService
                         $previousReading,
 
                     currentReading:
-                        $data['current_reading']
+                        $currentReading
                 );
 
             /*
@@ -112,7 +116,7 @@ class MeterReadingProcessorService
                         $previousReading,
 
                     currentReading:
-                        $data['current_reading'],
+                        $currentReading,
 
                     consumption:
                         $consumption
@@ -279,40 +283,62 @@ class MeterReadingProcessorService
     | Approve Reading
     |--------------------------------------------------------------------------
     */
+public function approve(
+    MeterReading $reading
+): MeterReading {
 
-    public function approve(
+    if (
+        $reading->isApproved()
+    ) {
 
-        MeterReading $reading
+        throw ValidationException::withMessages([
 
-    ): MeterReading {
+            'reading' => [
 
-        if (
-            $reading->isApproved()
+                'Meter reading already approved.',
+            ],
+        ]);
+    }
+
+    if (! $reading->canBeApproved()) {
+        throw ValidationException::withMessages([
+            'reading' => [
+                'Only verified readings can be approved. Resolve anomalies or re-capture the reading first.',
+            ],
+        ]);
+    }
+
+    DB::transaction(
+
+        function () use (
+            $reading
         ) {
 
-            throw ValidationException::withMessages([
+            $reading->update([
 
-                'reading' => [
+                'status' =>
+                    MeterReading::STATUS_APPROVED,
 
-                    'Meter reading already approved.',
-                ],
+                'approved_by' =>
+                    $this->user->id,
+
+                'approved_at' =>
+                    now(),
             ]);
+            
+
+            app(
+                GenerateChargeService::class
+            )->generateFromMeterReading(
+                $reading
+            );
         }
+    );
+    
 
-        $reading->update([
+    return $reading->fresh();
 
-            'status' =>
-                MeterReading::STATUS_APPROVED,
-
-            'approved_by' =>
-                $this->user->id,
-
-            'approved_at' =>
-                now(),
-        ]);
-
-        return $reading->fresh();
-    }
+}
 
     /*
     |--------------------------------------------------------------------------
@@ -378,7 +404,7 @@ class MeterReadingProcessorService
 
         Meter $meter
 
-    ): float {
+    ): string {
 
         $latestReading =
             $meter->readings()
@@ -393,16 +419,10 @@ class MeterReadingProcessorService
             $latestReading
         ) {
 
-            return (float)
-
-                $latestReading
-                    ->current_reading;
+            return Money::toScale((string) $latestReading->current_reading, 4);
         }
 
-        return (float)
-
-            $meter
-                ->initial_reading;
+        return Money::toScale((string) $meter->initial_reading, 4);
     }
 
     /*
@@ -413,17 +433,13 @@ class MeterReadingProcessorService
 
     protected function calculateConsumption(
 
-        float $previousReading,
+        string $previousReading,
 
-        float $currentReading
+        string $currentReading
 
-    ): float {
+    ): string {
 
-        if (
-            $currentReading
-            <
-            $previousReading
-        ) {
+        if (Money::comp($currentReading, $previousReading) < 0) {
 
             throw ValidationException::withMessages([
 
@@ -434,14 +450,7 @@ class MeterReadingProcessorService
             ]);
         }
 
-        return round(
-
-            $currentReading
-            -
-            $previousReading,
-
-            4
-        );
+        return Money::toScale(Money::sub($currentReading, $previousReading), 4);
     }
 
     /*
@@ -454,23 +463,15 @@ class MeterReadingProcessorService
 
         Meter $meter,
 
-        float $previousReading,
+        string $previousReading,
 
-        float $currentReading,
+        string $currentReading,
 
-        float $consumption
+        string $consumption
 
     ): array {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Negative Consumption
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            $consumption < 0
-        ) {
+        if (Money::comp($consumption, '0') < 0) {
 
             return [
 
@@ -481,15 +482,7 @@ class MeterReadingProcessorService
             ];
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Zero Consumption
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            $consumption == 0
-        ) {
+        if (Money::comp($consumption, '0') === 0) {
 
             return [
 
@@ -500,32 +493,14 @@ class MeterReadingProcessorService
             ];
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Historical Average Analysis
-        |--------------------------------------------------------------------------
-        */
-
         $averageConsumption =
             $this->calculateAverageConsumption(
                 $meter
             );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Spike Detection
-        |--------------------------------------------------------------------------
-        */
-
         if (
-
-            $averageConsumption > 0
-            &&
-
-            $consumption >
-            (
-                $averageConsumption * 3
-            )
+            Money::comp($averageConsumption, '0') > 0
+            && Money::comp($consumption, Money::mul($averageConsumption, '3')) > 0
         ) {
 
             return [
@@ -537,21 +512,9 @@ class MeterReadingProcessorService
             ];
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Sudden Drop Detection
-        |--------------------------------------------------------------------------
-        */
-
         if (
-
-            $averageConsumption > 0
-            &&
-
-            $consumption <
-            (
-                $averageConsumption * 0.10
-            )
+            Money::comp($averageConsumption, '0') > 0
+            && Money::comp($consumption, Money::mul($averageConsumption, '0.10')) < 0
         ) {
 
             return [
@@ -581,33 +544,15 @@ class MeterReadingProcessorService
 
         Meter $meter
 
-    ): float {
+    ): string {
 
-        return round(
+        $average = $meter->readings()
+            ->where('status', MeterReading::STATUS_APPROVED)
+            ->latest('reading_date')
+            ->limit(6)
+            ->avg('consumption');
 
-            (float)
-
-            $meter->readings()
-
-                ->where(
-
-                    'status',
-
-                    MeterReading::STATUS_APPROVED
-                )
-
-                ->latest(
-                    'reading_date'
-                )
-
-                ->limit(6)
-
-                ->avg(
-                    'consumption'
-                ),
-
-            4
-        );
+        return Money::toScale((string) ($average ?? '0'), 4);
     }
 
     /*

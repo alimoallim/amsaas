@@ -14,12 +14,14 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Traits\BelongsToCompany;
 
 class Meter extends Model
 {
     use HasFactory;
     use HasUuids;
     use SoftDeletes;
+    use BelongsToCompany;
 
     /*
     |--------------------------------------------------------------------------
@@ -355,13 +357,6 @@ class Meter extends Model
     |--------------------------------------------------------------------------
     */
 
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(
-            Company::class
-        );
-    }
-
     public function building(): BelongsTo
     {
         return $this->belongsTo(
@@ -425,6 +420,68 @@ class Meter extends Model
     | Query Scopes
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * Meters billable to a rental agreement — only when explicitly assigned to the unit or tenant.
+     * Building-level / unassigned shared meters are excluded.
+     */
+    public function scopeAssignedToAgreement(Builder $query, Agreement $agreement): Builder
+    {
+        return $query
+            ->where('company_id', $agreement->company_id)
+            ->where(function (Builder $q) use ($agreement) {
+                $hasScope = false;
+
+                if ($agreement->apartment_id) {
+                    $q->where('apartment_id', $agreement->apartment_id);
+                    $hasScope = true;
+                }
+
+                if ($agreement->tenant_id) {
+                    $hasScope
+                        ? $q->orWhere('tenant_id', $agreement->tenant_id)
+                        : $q->where('tenant_id', $agreement->tenant_id);
+                }
+
+                if (! $hasScope) {
+                    $q->whereRaw('1 = 0');
+                }
+            });
+    }
+
+    public function isAssignedToAgreement(Agreement $agreement): bool
+    {
+        if ($agreement->apartment_id && $this->apartment_id === $agreement->apartment_id) {
+            return true;
+        }
+
+        if ($agreement->tenant_id && $this->tenant_id === $agreement->tenant_id) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function canBillTenants(): bool
+    {
+        return filled($this->apartment_id) || filled($this->tenant_id);
+    }
+
+    /**
+     * Meters serving a building: direct assignment, unit in building, or tenant leased in building.
+     */
+    public function scopeForBuilding(Builder $query, string $buildingId): Builder
+    {
+        return $query->where(function (Builder $q) use ($buildingId) {
+            $q->where('building_id', $buildingId)
+                ->orWhereHas('apartment', function (Builder $aq) use ($buildingId) {
+                    $aq->where('building_id', $buildingId);
+                })
+                ->orWhereHas('tenant.agreements.apartment', function (Builder $apt) use ($buildingId) {
+                    $apt->where('building_id', $buildingId);
+                });
+        });
+    }
 
     public function scopeActive(
         Builder $query
@@ -538,7 +595,7 @@ class Meter extends Model
 
     public function isShared(): bool
     {
-        return $this->is_shared;
+        return (bool) $this->is_shared;
     }
 
     public function isSmartMeter(): bool
@@ -549,7 +606,8 @@ class Meter extends Model
 
     public function supportsRemoteReading(): bool
     {
-        return $this->supports_remote_reading;
+        return $this->supports_remote_reading === true
+            || ($this->supports_remote_reading === null && $this->isSmartMeter());
     }
 
     public function isDecommissioned(): bool
@@ -592,17 +650,13 @@ class Meter extends Model
 
     public function previousReadingValue(): float
     {
-        return (float)
+        $latest = $this->latestReading();
 
-            optional(
+        if ($latest) {
+            return (float) $latest->current_reading;
+        }
 
-                $this->latestReading()
-            )->current_reading
-
-            ??
-
-            (float)
-            $this->current_reading;
+        return (float) ($this->initial_reading ?? 0);
     }
 
     /*

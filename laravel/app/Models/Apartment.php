@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Apartment extends Model
@@ -224,12 +225,17 @@ class Apartment extends Model
     |--------------------------------------------------------------------------
     */
 
-    // public function agreements(): HasMany
-    // {
-    //     return $this->hasMany(
-    //         Agreement::class
-    //     );
-    // }
+    public function agreements(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Agreement::class);
+    }
+
+    public function activeLease(): HasOne
+    {
+        return $this->hasOne(Agreement::class, 'apartment_id')
+            ->where('status', Agreement::STATUS_ACTIVE)
+            ->latest('start_date');
+    }
 
     /*
     |--------------------------------------------------------------------------

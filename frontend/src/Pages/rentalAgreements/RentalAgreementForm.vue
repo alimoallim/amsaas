@@ -1,10 +1,10 @@
 <template>
-  <form class="agreement-form" @submit.prevent="handleSubmit">
+  <form class="agreement-form" :class="{ 'agreement-form--embedded': embedded }" @submit.prevent="handleSubmit">
 
     <!-- ══════════════════════════════════════════════════════════
          FORM HEADER
     ══════════════════════════════════════════════════════════ -->
-    <div class="form-header">
+    <div v-if="!embedded" class="form-header">
       <div class="form-header__left">
         <div class="form-header__icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -66,33 +66,61 @@
           </div>
 
           <div class="field-grid">
-            <!-- Apartment -->
+            <!-- Building (filters units) -->
             <div class="field-group">
               <label class="field-label">
-                Apartment
+                Building
                 <span class="field-required">*</span>
               </label>
               <div class="select-wrap">
                 <svg class="select-wrap__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
                 </svg>
                 <select
-                  v-model="form.apartment_id"
+                  v-model="selectedBuildingId"
                   :disabled="isReadonly || !canEditCoreFields"
                   class="field-select field-select--icon"
                 >
-                  <option value="">Select an apartment…</option>
-                  <option v-for="apartment in apartments" :key="apartment.id" :value="apartment.id">
-                    {{ apartmentLabel(apartment) }}
+                  <option value="">Select building first…</option>
+                  <option v-for="building in buildings" :key="building.id" :value="building.id">
+                    {{ buildingLabel(building) }}
                   </option>
                 </select>
                 <svg class="select-wrap__chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="6 9 12 15 18 9"/>
                 </svg>
               </div>
-              <p v-if="apartments.length === 0" class="field-hint field-hint--warn">
+              <p v-if="!buildings.length" class="field-hint field-hint--warn">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                No rental-enabled apartments available
+                No buildings available
+              </p>
+            </div>
+
+            <!-- Apartment (searchable, scoped to building) -->
+            <div class="field-group">
+              <label class="field-label">
+                Apartment / unit
+                <span class="field-required">*</span>
+              </label>
+              <ErpSearchSelect
+                v-model="form.apartment_id"
+                :options="apartmentOptions"
+                :disabled="isReadonly || !canEditCoreFields || !selectedBuildingId"
+                :loading="apartmentsLoading"
+                remote
+                placeholder="Select unit…"
+                search-placeholder="Search unit number, floor…"
+                :empty-text="apartmentEmptyText"
+                input-class="field-select field-select--icon"
+                :has-error="!!errors.apartment_id"
+                @search="onApartmentSearch"
+              />
+              <p v-if="selectedBuildingId && !apartmentsLoading && apartmentOptions.length === 0" class="field-hint field-hint--warn">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                {{ apartmentEmptyText }}
+              </p>
+              <p v-else-if="!selectedBuildingId" class="field-hint">
+                Choose a building to list rental units
               </p>
               <p v-if="errors.apartment_id" class="field-error">{{ errors.apartment_id[0] }}</p>
             </div>
@@ -148,11 +176,11 @@
           <div class="date-range-card">
             <div class="date-range-card__field">
               <p class="date-range-card__label">Start Date</p>
-              <input
+              <ErpDateInput
                 v-model="form.start_date"
-                type="date"
                 :disabled="isReadonly || !canEditCoreFields"
-                class="field-date"
+                input-class="field-date"
+                placeholder="Start date"
               />
               <p v-if="errors.start_date" class="field-error">{{ errors.start_date[0] }}</p>
             </div>
@@ -163,11 +191,12 @@
             </div>
             <div class="date-range-card__field">
               <p class="date-range-card__label">End Date</p>
-              <input
+              <ErpDateInput
                 v-model="form.end_date"
-                type="date"
                 :disabled="isReadonly"
-                class="field-date"
+                input-class="field-date"
+                placeholder="End date"
+                :min="form.start_date || ''"
               />
               <p v-if="errors.end_date" class="field-error">{{ errors.end_date[0] }}</p>
             </div>
@@ -178,7 +207,7 @@
             <label class="field-label">Agreement Status</label>
             <div class="status-select-grid">
               <button
-                v-for="s in statusOptions"
+                v-for="s in statusOptionsForMode"
                 :key="s.value"
                 type="button"
                 :disabled="isReadonly || !canEditCoreFields"
@@ -298,70 +327,155 @@
           </div>
         </section>
 
-        <!-- ─── 4. Utilities ───────────────────────────────────── -->
-        <section class="form-section" id="sec-utilities" data-section="utilities">
+        <!-- ─── 4. Recurring billing ───────────────────────────── -->
+        <section class="form-section" id="sec-billing" data-section="billing">
           <div class="section-header">
-            <div class="section-header__icon section-header__icon--amber">
+            <div class="section-header__icon section-header__icon--violet">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
               </svg>
             </div>
             <div>
-              <h3 class="section-header__title">Utilities & Coverage</h3>
-              <p class="section-header__sub">Select which services are included in the rent</p>
+              <h3 class="section-header__title">Recurring billing</h3>
+              <p class="section-header__sub">Link charge models — rent uses monthly rent above; services use amounts below; utilities bill from meter readings</p>
             </div>
           </div>
 
-          <div class="utility-grid">
+          <div class="billing-panel">
+            <div class="billing-rent-card">
+              <div class="billing-rent-card__head">
+                <span class="billing-rent-card__title">Rent</span>
+                <span class="billing-rent-card__badge">From rental agreement</span>
+              </div>
+              <div class="field-grid">
+                <div class="field-group field-group--full">
+                  <label class="field-label">Rent charge model</label>
+                  <select
+                    v-model="form.rent_charge_model_id"
+                    :disabled="!canEditBilling || !rentChargeModels.length"
+                    class="field-select"
+                  >
+                    <option value="">Default active rent model</option>
+                    <option v-for="m in rentChargeModels" :key="m.id" :value="m.id">
+                      {{ m.name }} ({{ m.code }})
+                    </option>
+                  </select>
+                  <p v-if="!rentChargeModels.length" class="field-hint field-hint--warn">
+                    Create an active charge model with policy “Rent from rental agreement” under Finance → Charge Models.
+                  </p>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Amount billed</label>
+                  <p class="billing-rent-card__amount">
+                    {{ form.currency || 'USD' }} {{ form.monthly_rent || '0' }} / month
+                  </p>
+                  <p class="field-hint">Uses monthly rent from Financial Terms — not stored on the charge model.</p>
+                </div>
+              </div>
+            </div>
 
-            <label :class="['utility-card', { 'utility-card--checked': form.includes_water, 'utility-card--disabled': isReadonly }]">
-              <input v-model="form.includes_water" type="checkbox" :disabled="isReadonly" class="utility-card__check" />
-              <div class="utility-card__icon utility-card__icon--blue">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
-                </svg>
+            <div class="billing-services">
+              <div class="billing-services__head">
+                <span class="billing-services__title">Additional charges & utilities</span>
+                <div v-if="canEditBilling" class="billing-services__actions">
+                  <button type="button" class="btn-add-line" @click="addServiceRow">
+                    + Add service
+                  </button>
+                  <button type="button" class="btn-add-line btn-add-line--utility" @click="addUtilityRow">
+                    + Add utility
+                  </button>
+                </div>
               </div>
-              <div class="utility-card__body">
-                <span class="utility-card__name">Water</span>
-                <span class="utility-card__sub">Included in rent</span>
-              </div>
-              <div class="utility-card__toggle" :class="{ 'utility-card__toggle--on': form.includes_water }">
-                <span class="utility-card__toggle-knob"></span>
-              </div>
-            </label>
+              <p class="field-hint billing-services__intro">
+                Service fees: flat monthly amounts (security, cleaning, parking).
+                Utilities: link metered charge models — consumption is billed from meter readings at month end.
+              </p>
 
-            <label :class="['utility-card', { 'utility-card--checked': form.includes_electricity, 'utility-card--disabled': isReadonly }]">
-              <input v-model="form.includes_electricity" type="checkbox" :disabled="isReadonly" class="utility-card__check" />
-              <div class="utility-card__icon utility-card__icon--amber">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                </svg>
+              <div v-if="!form.recurring_charges?.length" class="billing-empty">
+                No additional charges yet. Add metered utilities (water, electricity) or flat service fees.
               </div>
-              <div class="utility-card__body">
-                <span class="utility-card__name">Electricity</span>
-                <span class="utility-card__sub">Included in rent</span>
-              </div>
-              <div class="utility-card__toggle" :class="{ 'utility-card__toggle--on': form.includes_electricity }">
-                <span class="utility-card__toggle-knob"></span>
-              </div>
-            </label>
 
-            <label :class="['utility-card', { 'utility-card--checked': form.includes_internet, 'utility-card--disabled': isReadonly }]">
-              <input v-model="form.includes_internet" type="checkbox" :disabled="isReadonly" class="utility-card__check" />
-              <div class="utility-card__icon utility-card__icon--purple">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/>
-                </svg>
+              <div
+                v-for="(row, index) in form.recurring_charges"
+                :key="row.id || `new-${index}`"
+                class="billing-line"
+              >
+                <div class="field-grid billing-line__grid">
+                  <div class="field-group field-group--full">
+                    <label class="field-label">
+                      {{ row.preferMetered ? 'Utility charge model' : 'Charge model' }}
+                    </label>
+                    <select
+                      v-model="row.charge_model_id"
+                      :disabled="!canEditBilling"
+                      class="field-select"
+                      @change="onRecurringModelChange(row)"
+                    >
+                      <option value="">Select…</option>
+                      <option
+                        v-for="m in modelsForRow(row, index)"
+                        :key="m.id"
+                        :value="m.id"
+                      >
+                        {{ m.name }} — {{ chargeModelPolicyLabel(m) }}
+                      </option>
+                    </select>
+                    <p v-if="recurringRowError(index, 'charge_model_id')" class="field-error">
+                      {{ recurringRowError(index, 'charge_model_id') }}
+                    </p>
+                  </div>
+                  <div v-if="rowNeedsAmount(resolveModel(row))" class="field-group">
+                    <label class="field-label">Monthly amount <span class="field-required">*</span></label>
+                    <div class="input-affix-wrap">
+                      <span class="input-prefix">{{ form.currency || 'USD' }}</span>
+                      <input
+                        v-model.number="row.override_amount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        :disabled="!canEditBilling"
+                        class="field-input field-input--prefix"
+                      />
+                    </div>
+                    <p v-if="recurringRowError(index, 'override_amount')" class="field-error">
+                      {{ recurringRowError(index, 'override_amount') }}
+                    </p>
+                  </div>
+                  <div v-if="rowNeedsUnitRate(resolveModel(row))" class="field-group">
+                    <label class="field-label">Unit rate override</label>
+                    <input
+                      v-model.number="row.override_unit_rate"
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      :disabled="!canEditBilling"
+                      :placeholder="resolveModel(row)?.unit_rate != null ? String(resolveModel(row).unit_rate) : 'Model default'"
+                      class="field-input"
+                    />
+                    <p class="field-hint">Leave blank to use the charge model default rate.</p>
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label">Label (optional)</label>
+                    <input
+                      v-model="row.custom_name"
+                      type="text"
+                      :disabled="!canEditBilling"
+                      class="field-input"
+                      :placeholder="row.preferMetered ? 'e.g. Unit electricity' : 'e.g. Security service'"
+                    />
+                  </div>
+                </div>
+                <button
+                  v-if="canEditBilling"
+                  type="button"
+                  class="billing-line__remove"
+                  aria-label="Remove line"
+                  @click="removeRecurringRow(index)"
+                >
+                  Remove
+                </button>
               </div>
-              <div class="utility-card__body">
-                <span class="utility-card__name">Internet</span>
-                <span class="utility-card__sub">Included in rent</span>
-              </div>
-              <div class="utility-card__toggle" :class="{ 'utility-card__toggle--on': form.includes_internet }">
-                <span class="utility-card__toggle-knob"></span>
-              </div>
-            </label>
-
+            </div>
           </div>
         </section>
 
@@ -417,103 +531,6 @@
           </div>
         </section>
 
-        <!-- ─── 6. Documentation ──────────────────────────────── -->
-        <section class="form-section" id="sec-docs" data-section="docs">
-          <div class="section-header">
-            <div class="section-header__icon section-header__icon--rose">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-              </svg>
-            </div>
-            <div>
-              <h3 class="section-header__title">Documentation</h3>
-              <p class="section-header__sub">Attach the signed contract PDF</p>
-            </div>
-          </div>
-
-          <label
-            class="file-drop-zone"
-            :class="{ 'file-drop-zone--disabled': isReadonly, 'file-drop-zone--has-file': !!form.contract_file }"
-            @dragover.prevent
-            @drop.prevent="!isReadonly && (form.contract_file = $event.dataTransfer.files[0])"
-          >
-            <input
-              type="file"
-              accept=".pdf"
-              :disabled="isReadonly"
-              @change="form.contract_file = $event.target.files[0]"
-              class="file-drop-zone__input"
-            />
-            <div v-if="!form.contract_file" class="file-drop-zone__placeholder">
-              <div class="file-drop-zone__icon">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                  <line x1="12" y1="12" x2="12" y2="18"/>
-                  <line x1="9" y1="15" x2="15" y2="15"/>
-                </svg>
-              </div>
-              <p class="file-drop-zone__title">Drop PDF here or <span class="file-drop-zone__link">browse</span></p>
-              <p class="file-drop-zone__hint">PDF files only · Max 10 MB</p>
-            </div>
-            <div v-else class="file-drop-zone__preview">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-              </svg>
-              <span class="file-drop-zone__name">{{ form.contract_file?.name }}</span>
-              <button type="button" class="file-drop-zone__remove" @click.prevent="form.contract_file = null">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
-            </div>
-          </label>
-        </section>
-
-        <!-- ─── 7. Notes & Legal ───────────────────────────────── -->
-        <section class="form-section" id="sec-notes" data-section="notes">
-          <div class="section-header">
-            <div class="section-header__icon section-header__icon--slate">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
-                <line x1="8" y1="18" x2="21" y2="18"/>
-                <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-              </svg>
-            </div>
-            <div>
-              <h3 class="section-header__title">Notes & Legal Terms</h3>
-              <p class="section-header__sub">Special clauses and internal operational notes</p>
-            </div>
-          </div>
-
-          <div class="notes-grid">
-            <div class="field-group">
-              <label class="field-label">Special Terms & Legal Clauses</label>
-              <textarea
-                v-model="form.special_terms"
-                rows="5"
-                :disabled="isReadonly"
-                placeholder="Enter any special terms, legal clauses, or conditions that apply to this agreement…"
-                class="field-textarea"
-              />
-            </div>
-            <div class="field-group">
-              <label class="field-label">
-                Internal Notes
-                <span class="field-hint-inline">not visible to tenant</span>
-              </label>
-              <textarea
-                v-model="form.notes"
-                rows="4"
-                :disabled="isReadonly"
-                placeholder="Operational notes, reminders, or internal context…"
-                class="field-textarea field-textarea--internal"
-              />
-            </div>
-          </div>
-        </section>
-
       </div>
       <!-- /form-sections -->
 
@@ -554,37 +571,186 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import api from '@/services/api'
+import { ErpDateInput, ErpSearchSelect } from '@/components/erp'
+import { useBuildingApartments } from '@/composables/useBuildingApartments'
+import { tenantDisplayName } from '@/utils/tenantDisplayName'
+import {
+  emptyRecurringChargeRow,
+  chargeModelPolicyLabel,
+  rowNeedsAmount,
+  rowNeedsUnitRate,
+} from '@/utils/rentalAgreementBilling'
 
 const props = defineProps({
   form:       { type: Object,  required: true },
   errors:     { type: Object,  default: () => ({}) },
   loading:    { type: Boolean, default: false },
   mode:       { type: String,  default: 'create' },
+  buildings:  { type: Array,   default: () => [] },
+  /** @deprecated use buildings + building-scoped fetch */
   apartments: { type: Array,   default: () => [] },
   tenants:    { type: Array,   default: () => [] },
+  initialBuildingId: { type: [String, Number], default: '' },
   initialStatus: {
-  type: String,
-  default: '',
-},
+    type: String,
+    default: '',
+  },
+  embedded: { type: Boolean, default: false },
 })
 const emit = defineEmits(['submit', 'cancel'])
+
+const selectedBuildingId = ref('')
+const { apartments: buildingApartments, loading: apartmentsLoading, fetchApartments, apartmentToOption } = useBuildingApartments()
+
+const apartmentOptions = computed(() =>
+  buildingApartments.value.map((apt) => apartmentToOption(apt))
+)
+
+const apartmentEmptyText = computed(() => {
+  if (!selectedBuildingId.value) return 'Select a building first'
+  return props.mode === 'create'
+    ? 'No available rental units in this building'
+    : 'No rental units found in this building'
+})
+
+let apartmentSearchDebounce = null
+function onApartmentSearch(query) {
+  clearTimeout(apartmentSearchDebounce)
+  apartmentSearchDebounce = setTimeout(() => reloadApartments(query), 280)
+}
+
+async function reloadApartments(search = '') {
+  if (!selectedBuildingId.value) return
+  await fetchApartments(selectedBuildingId.value, {
+    search,
+    mode: props.mode,
+    ensureId: props.form.apartment_id || undefined,
+  })
+}
+
+function buildingLabel(building) {
+  const parts = [building.name, building.city, building.code].filter(Boolean)
+  return parts.join(' · ')
+}
+
+watch(
+  () => props.initialBuildingId,
+  (id) => {
+    if (id && String(id) !== selectedBuildingId.value) {
+      selectedBuildingId.value = String(id)
+    }
+  },
+  { immediate: true }
+)
+
+watch(selectedBuildingId, async (id, prev) => {
+  if (!id) {
+    buildingApartments.value = []
+    return
+  }
+  if (prev && id !== prev) {
+    props.form.apartment_id = ''
+  }
+  await reloadApartments()
+})
 /* ── Computed modes ──────────────────────────────────────────── */
 const isReadonly = computed(() => props.mode === 'readonly')
 const isEdit     = computed(() => props.mode === 'edit')
-//const canEditCoreFields = computed(() => props.form?.status !== 'active')
-const canEditCoreFields = computed(() => {
-  return props.initialStatus !== 'active'
-})
+const canEditCoreFields = computed(() => props.initialStatus !== 'active')
+/** Billing lines (services + metered utilities) stay editable on active agreements. */
+const canEditBilling = computed(() => !isReadonly.value)
 /* ── Section nav ─────────────────────────────────────────────── */
+const chargeModels = ref([])
+
+const rentChargeModels = computed(() =>
+  chargeModels.value.filter((m) => m.pricing_strategy === 'agreement_rent')
+)
+
+const utilityChargeModels = computed(() =>
+  chargeModels.value.filter((m) => m.pricing_strategy === 'metered')
+)
+
+const serviceChargeModels = computed(() =>
+  chargeModels.value.filter(
+    (m) => m.pricing_strategy !== 'agreement_rent' && m.pricing_strategy !== 'metered'
+  )
+)
+
+function modelsForRow(row, index) {
+  const pool = row.preferMetered ? utilityChargeModels.value : serviceChargeModels.value
+  const usedElsewhere = new Set(
+    (props.form.recurring_charges ?? [])
+      .filter((_, i) => i !== index)
+      .map((r) => r.charge_model_id)
+      .filter(Boolean),
+  )
+
+  return pool.filter((m) => m.id === row.charge_model_id || !usedElsewhere.has(m.id))
+}
+
+async function loadChargeModels() {
+  try {
+    const { data } = await api.get('/charge-models', {
+      params: { status: 'active', per_page: 50 },
+    })
+    chargeModels.value = data.data ?? []
+  } catch (error) {
+    chargeModels.value = []
+    if (error.response?.status !== 403) {
+      console.warn('Could not load charge models for billing section.', error.response?.status)
+    }
+  }
+}
+
+function ensureBillingFields() {
+  if (!Array.isArray(props.form.recurring_charges)) {
+    props.form.recurring_charges = []
+  }
+  if (props.form.rent_charge_model_id === undefined) {
+    props.form.rent_charge_model_id = ''
+  }
+}
+
+function addServiceRow() {
+  ensureBillingFields()
+  props.form.recurring_charges.push(emptyRecurringChargeRow())
+}
+
+function addUtilityRow() {
+  ensureBillingFields()
+  props.form.recurring_charges.push({ ...emptyRecurringChargeRow(), preferMetered: true })
+}
+
+function removeRecurringRow(index) {
+  props.form.recurring_charges.splice(index, 1)
+}
+
+function resolveModel(row) {
+  return chargeModels.value.find((m) => m.id === row.charge_model_id) ?? null
+}
+
+function onRecurringModelChange(row) {
+  const model = resolveModel(row)
+  if (!model) return
+  row.preferMetered = model.pricing_strategy === 'metered'
+  if (!rowNeedsAmount(model)) row.override_amount = null
+  if (!rowNeedsUnitRate(model)) row.override_unit_rate = null
+}
+
+function recurringRowError(index, field) {
+  const key = `recurring_charges.${index}.${field}`
+  const err = props.errors[key]
+  return Array.isArray(err) ? err[0] : err
+}
+
 const sections = [
   { id: 'assignment', label: 'Assignment',    icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>' },
   { id: 'period',     label: 'Period',        icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' },
   { id: 'financial',  label: 'Financial',     icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>' },
-  { id: 'utilities',  label: 'Utilities',     icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' },
+  { id: 'billing',    label: 'Billing',       icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>' },
   { id: 'renewal',    label: 'Renewal',       icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>' },
-  { id: 'docs',       label: 'Documents',     icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' },
-  { id: 'notes',      label: 'Notes',         icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/></svg>' },
 ]
 
 const activeSection = ref('assignment')
@@ -598,6 +764,8 @@ const scrollToSection = (id) => {
 
 let observer = null
 onMounted(() => {
+  ensureBillingFields()
+  loadChargeModels()
   observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) activeSection.value = entry.target.dataset.section
@@ -609,7 +777,7 @@ onMounted(() => {
 onUnmounted(() => observer?.disconnect())
 
 /* ── Static options ──────────────────────────────────────────── */
-const statusOptions = [
+const allStatusOptions = [
   { value: 'draft',      label: 'Draft'      },
   { value: 'pending',    label: 'Pending'    },
   { value: 'active',     label: 'Active'     },
@@ -617,27 +785,33 @@ const statusOptions = [
   { value: 'expired',    label: 'Expired'    },
 ]
 
+const statusOptionsForMode = computed(() => {
+  if (props.mode === 'create') {
+    return allStatusOptions.filter((s) =>
+      ['draft', 'pending', 'active'].includes(s.value)
+    )
+  }
+  return allStatusOptions
+})
+
 const currencyOptions = ['USD', 'EUR', 'GBP', 'AED', 'SAR', 'TRY', 'KES', 'NGN', 'ZAR', 'EGP', 'SOS']
 
-/* ── Label helpers (unchanged) ───────────────────────────────── */
-function apartmentLabel(apartment) {
-  const building = apartment.building?.name || ''
-  const unit     = apartment.unit?.unit_number || apartment.unit_number || ''
-  const floor    = apartment.unit?.floor || apartment.floor || null
-  return [building, unit ? `Unit ${unit}` : null, floor ? `Floor ${floor}` : null].filter(Boolean).join(' — ')
-}
-
 function tenantLabel(tenant) {
-  return (
-    tenant.display_name ||
-    tenant.full_display_name ||
-    tenant.full_name ||
-    ((tenant.name?.first_name && tenant.name?.last_name) ? `${tenant.name.first_name} ${tenant.name.last_name}` : null) ||
-    tenant.name || tenant.email || tenant.tenant_code || tenant.id
-  )
+  return tenantDisplayName(tenant) || tenant.email || tenant.tenant_code || tenant.id
 }
 
-function handleSubmit() { emit('submit') }
+
+function handleSubmit() {
+  if (Array.isArray(props.form.recurring_charges)) {
+    props.form.recurring_charges = props.form.recurring_charges.filter(
+      (row) => row.charge_model_id
+    )
+  }
+  if (!props.form.status || !statusOptionsForMode.value.some((s) => s.value === props.form.status)) {
+    props.form.status = 'draft'
+  }
+  emit('submit')
+}
 </script>
 
 <style scoped>
@@ -847,6 +1021,62 @@ function handleSubmit() { emit('submit') }
 .section-header__icon--indigo  { background: #eef2ff; color: #4f46e5; }
 .section-header__icon--blue    { background: #eff6ff; color: #2563eb; }
 .section-header__icon--emerald { background: #ecfdf5; color: #059669; }
+.section-header__icon--violet { background: #ede9fe; color: #6d28d9; }
+
+.billing-panel { display: flex; flex-direction: column; gap: 16px; }
+.billing-rent-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fafafa;
+}
+.billing-rent-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.billing-rent-card__title { font-size: 14px; font-weight: 600; color: var(--text); }
+.billing-rent-card__badge { font-size: 11px; font-weight: 500; color: #6d28d9; background: #ede9fe; padding: 2px 8px; border-radius: 999px; }
+.billing-rent-card__amount { font-size: 18px; font-weight: 700; color: var(--text); margin: 4px 0 0; }
+.billing-services__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.billing-services__title { font-size: 14px; font-weight: 600; color: var(--text); }
+.billing-services__actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.billing-services__intro { margin: 6px 0 12px; }
+.btn-add-line {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  background: #eef2ff;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.btn-add-line--utility {
+  color: #b45309;
+  background: #fffbeb;
+}
+.billing-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.billing-line {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+.billing-line__remove {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #b91c1c;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.field-group--full { grid-column: 1 / -1; }
 .section-header__icon--amber   { background: #fffbeb; color: #d97706; }
 .section-header__icon--teal    { background: #f0fdfa; color: #0d9488; }
 .section-header__icon--rose    { background: #fff1f2; color: #e11d48; }
@@ -870,11 +1100,16 @@ function handleSubmit() { emit('submit') }
 ════════════════════════════════════════════════════════════ */
 .field-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px 24px;
 }
 
-.field-group { display: flex; flex-direction: column; gap: 0; }
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
 
 .field-label {
   display: flex;
@@ -1434,6 +1669,63 @@ function handleSubmit() { emit('submit') }
   animation: spin .7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ════════════════════════════════════════════════════════════
+   Embedded in FormModal
+════════════════════════════════════════════════════════════ */
+.agreement-form--embedded {
+  height: auto;
+  font-family: inherit;
+}
+
+.agreement-form--embedded .form-body {
+  flex-direction: column;
+}
+
+.agreement-form--embedded .section-nav {
+  display: none;
+}
+
+.agreement-form--embedded .form-sections {
+  padding-bottom: 0;
+}
+
+.agreement-form--embedded .form-section {
+  padding: 20px 0;
+}
+
+.agreement-form--embedded .field-grid,
+.agreement-form--embedded .notes-grid,
+.agreement-form--embedded .utility-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.agreement-form--embedded .field-group {
+  max-width: none !important;
+  flex: initial !important;
+  min-width: 0;
+}
+
+.agreement-form--embedded .field-input,
+.agreement-form--embedded .field-select,
+.agreement-form--embedded .field-textarea,
+.agreement-form--embedded .field-select--icon {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.agreement-form--embedded .action-bar {
+  position: sticky;
+  bottom: 0;
+  margin: 0 -0.25rem;
+  background: #fff;
+  border-top: 1px solid var(--border);
+}
+
+.agreement-form--embedded .action-bar__inner {
+  padding: 12px 0;
+}
 
 /* ════════════════════════════════════════════════════════════
    Responsive

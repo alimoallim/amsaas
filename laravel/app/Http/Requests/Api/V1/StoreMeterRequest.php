@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\Apartment;
 use App\Models\Meter;
 
 use Illuminate\Validation\Rule;
@@ -34,7 +35,7 @@ class StoreMeterRequest extends FormRequest
 
             'building_id' => [
 
-                'required',
+                'nullable',
 
                 'uuid',
 
@@ -70,10 +71,12 @@ class StoreMeterRequest extends FormRequest
                     fn ($query) =>
 
                     $query->where(
-
                         'company_id',
-
                         $this->user()->company_id
+                    )
+                    ->when(
+                        $this->filled('building_id'),
+                        fn ($q) => $q->where('building_id', $this->building_id)
                     )
                 ),
             ],
@@ -417,74 +420,130 @@ class StoreMeterRequest extends FormRequest
 
                 /*
                 |--------------------------------------------------------------------------
-                | Shared Meter Validation
+                | Unit assignment requires a building
                 |--------------------------------------------------------------------------
                 */
 
-                if (
-
-                    $this->boolean(
-                        'is_shared'
-                    )
-
-                    &&
-
-                    !$this->building_id
-                ) {
+                if ($this->filled('apartment_id') && ! $this->building_id) {
 
                     $validator->errors()->add(
 
                         'building_id',
 
+                        'Select a building when assigning a unit.'
+                    );
+                }
+
+                if ($this->filled('apartment_id') && $this->filled('building_id')) {
+
+                    $belongs = Apartment::query()
+                        ->where('id', $this->apartment_id)
+                        ->where('building_id', $this->building_id)
+                        ->where('company_id', $this->user()->company_id)
+                        ->exists();
+
+                    if (! $belongs) {
+
+                        $validator->errors()->add(
+
+                            'apartment_id',
+
+                            'The selected unit does not belong to this building.'
+                        );
+                    }
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Building ownership
+                |--------------------------------------------------------------------------
+                */
+
+                if ($this->ownership_type === Meter::OWNERSHIP_BUILDING) {
+
+                    if (! $this->building_id) {
+
+                        $validator->errors()->add(
+                            'building_id',
+                            'Select the building this meter serves.'
+                        );
+                    }
+
+                    if ($this->filled('apartment_id')) {
+
+                        $validator->errors()->add(
+                            'apartment_id',
+                            'Building-level meters must not be assigned to a unit.'
+                        );
+                    }
+
+                    if ($this->filled('tenant_id')) {
+
+                        $validator->errors()->add(
+                            'tenant_id',
+                            'Building-level meters must not be assigned to a tenant.'
+                        );
+                    }
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Shared / apartment ownership — building required
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    in_array($this->ownership_type, [Meter::OWNERSHIP_SHARED, Meter::OWNERSHIP_APARTMENT], true)
+                    && ! $this->building_id
+                ) {
+
+                    $validator->errors()->add(
+                        'building_id',
+                        'Select a building for this meter.'
+                    );
+                }
+
+                if (
+                    $this->boolean('is_shared')
+                    && ! $this->building_id
+                ) {
+
+                    $validator->errors()->add(
+                        'building_id',
                         'Shared meters must belong to a building.'
                     );
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | Apartment Ownership Validation
-                |--------------------------------------------------------------------------
-                */
-
                 if (
-
-                    $this->ownership_type ===
-                    Meter::OWNERSHIP_APARTMENT
-
-                    &&
-
-                    !$this->apartment_id
+                    $this->ownership_type === Meter::OWNERSHIP_APARTMENT
+                    && ! $this->apartment_id
                 ) {
 
                     $validator->errors()->add(
-
                         'apartment_id',
-
-                        'Apartment ownership meters require apartment assignment.'
+                        'Select the unit this meter serves.'
                     );
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | Tenant Ownership Validation
-                |--------------------------------------------------------------------------
-                */
-
                 if (
-
-                    $this->ownership_type ===
-                    Meter::OWNERSHIP_TENANT
-
-                    &&
-
-                    !$this->tenant_id
+                    $this->ownership_type === Meter::OWNERSHIP_TENANT
+                    && ! $this->tenant_id
                 ) {
 
                     $validator->errors()->add(
-
                         'tenant_id',
+                        'Select the tenant billed for this meter.'
+                    );
+                }
 
-                        'Tenant ownership meters require tenant assignment.'
+                if (
+                    $this->ownership_type === Meter::OWNERSHIP_TENANT
+                    && $this->filled('apartment_id')
+                ) {
+
+                    $validator->errors()->add(
+                        'apartment_id',
+                        'Tenant ownership uses the tenant field only — do not assign a unit.'
                     );
                 }
             }

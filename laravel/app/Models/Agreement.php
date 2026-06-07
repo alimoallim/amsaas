@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Agreement extends Model
@@ -279,6 +280,14 @@ class Agreement extends Model
         );
     }
 
+    public function agreementCharges(): HasMany
+    {
+        return $this->hasMany(
+            AgreementCharge::class,
+            'agreement_id'
+        );
+    }
+
     public function saleAgreement(): HasOne
     {
         return $this->hasOne(
@@ -435,10 +444,13 @@ class Agreement extends Model
 
             [
 
+                self::STATUS_DRAFT,
+
                 self::STATUS_APPROVED,
 
                 self::STATUS_RENEWED,
-            ]
+            ],
+            true
         );
     }
 

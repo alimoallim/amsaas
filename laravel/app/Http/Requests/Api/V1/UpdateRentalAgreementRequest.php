@@ -2,14 +2,17 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Http\Requests\Api\V1\Concerns\ValidatesAgreementBilling;
 use App\Models\Agreement;
 use App\Models\Apartment;
-
+use App\Models\RentalAgreement;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Auth;
 
 class UpdateRentalAgreementRequest extends FormRequest
 {
+    use ValidatesAgreementBilling;
     /*
     |--------------------------------------------------------------------------
     | Authorization
@@ -18,7 +21,7 @@ class UpdateRentalAgreementRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return auth()->check();
+        return auth::check();
     }
 
     /*
@@ -29,88 +32,49 @@ class UpdateRentalAgreementRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
-
+        return array_merge([
             /*
             |--------------------------------------------------------------------------
             | Core Agreement Relationships
             |--------------------------------------------------------------------------
-            |
-            | These become immutable once agreement is active.
-            |--------------------------------------------------------------------------
             */
-
             'apartment_id' => [
-
                 'sometimes',
-
                 'uuid',
-
-                Rule::exists(
-                    'apartments',
-                    'id'
-                )->where(
-
-                    fn ($query) =>
-
-                    $query->where(
-
-                        'company_id',
-
-                        auth()->user()->company_id
-                    )
+                Rule::exists('apartments', 'id')->where(
+                    fn ($query) => $query->where('company_id', auth::user()->company_id)
                 ),
             ],
-
             'tenant_id' => [
-
                 'sometimes',
-
                 'uuid',
-
-                Rule::exists(
-                    'tenants',
-                    'id'
-                )->where(
-
-                    fn ($query) =>
-
-                    $query->where(
-
-                        'company_id',
-
-                        auth()->user()->company_id
-                    )
+                Rule::exists('tenants', 'id')->where(
+                    fn ($query) => $query->where('company_id', auth::user()->company_id)
                 ),
             ],
 
             /*
             |--------------------------------------------------------------------------
-            | Agreement Dates
+            | Agreement Dates & Status
             |--------------------------------------------------------------------------
             */
+            'start_date' => ['sometimes', 'date'],
+            'end_date' => ['nullable', 'date'],
+            'signed_at' => ['nullable', 'date'],
 
-            'start_date' => [
-
+            'status' => [
                 'sometimes',
-
-                'date',
-            ],
-
-            'end_date' => [
-
-                'nullable',
-
-                'date',
-
-                'after:start_date',
-            ],
-
-            'signed_at' => [
-
-                'nullable',
-
-                'date',
+                'string',
+                Rule::in([
+                    Agreement::STATUS_DRAFT,
+                    Agreement::STATUS_PENDING_APPROVAL,
+                    Agreement::STATUS_APPROVED,
+                    Agreement::STATUS_ACTIVE,
+                    Agreement::STATUS_TERMINATED,
+                    Agreement::STATUS_COMPLETED,
+                    Agreement::STATUS_CANCELLED,
+                    Agreement::STATUS_EXPIRED,
+                ]),
             ],
 
             /*
@@ -118,211 +82,59 @@ class UpdateRentalAgreementRequest extends FormRequest
             | Financial Terms
             |--------------------------------------------------------------------------
             */
-
-            'monthly_rent' => [
-
-                'sometimes',
-
-                'numeric',
-
-                'gt:0',
-            ],
-
-            'deposit_amount' => [
-
-                'nullable',
-
-                'numeric',
-
-                'min:0',
-            ],
-
-            'contract_amount' => [
-
-                'nullable',
-
-                'numeric',
-
-                'min:0',
-            ],
-
-            'currency' => [
-
-                'nullable',
-
-                'string',
-
-                'max:10',
-            ],
+            'monthly_rent'     => ['sometimes', 'numeric', 'gt:0'],
+            'security_deposit' => ['nullable', 'numeric', 'min:0'],
+            'contract_amount'  => ['nullable', 'numeric', 'min:0'],
+            'currency'         => ['nullable', 'string', 'max:10'],
 
             /*
             |--------------------------------------------------------------------------
             | Payment Configuration
             |--------------------------------------------------------------------------
             */
-
-            'payment_due_day' => [
-
-                'sometimes',
-
-                'integer',
-
-                'between:1,28',
-            ],
+            'payment_due_day' => ['sometimes', 'integer', 'between:1,28'],
 
             /*
             |--------------------------------------------------------------------------
             | Utilities
             |--------------------------------------------------------------------------
             */
-
-            'includes_water' => [
-
-                'nullable',
-
-                'boolean',
-            ],
-
-            'includes_electricity' => [
-
-                'nullable',
-
-                'boolean',
-            ],
-
-            'includes_internet' => [
-
-                'nullable',
-
-                'boolean',
-            ],
+            'includes_water'       => ['nullable', 'boolean'],
+            'includes_electricity' => ['nullable', 'boolean'],
+            'includes_internet'    => ['nullable', 'boolean'],
 
             /*
             |--------------------------------------------------------------------------
             | Renewal Policy
             |--------------------------------------------------------------------------
             */
-
-            'auto_renew' => [
-
-                'nullable',
-
-                'boolean',
-            ],
-
-            'renewal_notice_days' => [
-
-                'nullable',
-
-                'integer',
-
-                'min:1',
-
-                'max:365',
-            ],
-
-            /*
-            |--------------------------------------------------------------------------
-            | Status Security
-            |--------------------------------------------------------------------------
-            |
-            | Prevent direct workflow manipulation.
-            |--------------------------------------------------------------------------
-            */
-
-            'status' => [
-
-                'prohibited',
-            ],
+            'auto_renew'          => ['nullable', 'boolean'],
+            'renewal_notice_days' => ['nullable', 'integer', 'min:1', 'max:365'],
 
             /*
             |--------------------------------------------------------------------------
             | Audit Security
             |--------------------------------------------------------------------------
             */
-
-            'company_id' => [
-
-                'prohibited',
-            ],
-
-            'agreement_number' => [
-
-                'prohibited',
-            ],
-
-            'agreement_type' => [
-
-                'prohibited',
-            ],
-
-            'approved_by' => [
-
-                'prohibited',
-            ],
-
-            'approved_at' => [
-
-                'prohibited',
-            ],
-
-            'terminated_by' => [
-
-                'prohibited',
-            ],
-
-            'terminated_at' => [
-
-                'prohibited',
-            ],
-
-            'created_by' => [
-
-                'prohibited',
-            ],
-
-            'updated_by' => [
-
-                'prohibited',
-            ],
+            'company_id'       => ['prohibited'],
+            'agreement_number' => ['prohibited'],
+            'agreement_type'   => ['prohibited'],
+            'approved_by'      => ['prohibited'],
+            'approved_at'      => ['prohibited'],
+            'terminated_by'    => ['prohibited'],
+            'terminated_at'    => ['prohibited'],
+            'created_by'       => ['prohibited'],
+            'updated_by'       => ['prohibited'],
 
             /*
             |--------------------------------------------------------------------------
-            | Files
+            | Files & Notes
             |--------------------------------------------------------------------------
             */
-
-            'contract_file' => [
-
-                'nullable',
-
-                'file',
-
-                'mimes:pdf',
-
-                'max:10240',
-            ],
-
-            /*
-            |--------------------------------------------------------------------------
-            | Notes
-            |--------------------------------------------------------------------------
-            */
-
-            'notes' => [
-
-                'nullable',
-
-                'string',
-            ],
-
-            'special_terms' => [
-
-                'nullable',
-
-                'string',
-            ],
-        ];
+            'contract_file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'notes'         => ['nullable', 'string'],
+            'special_terms' => ['nullable', 'string'],
+        ], $this->agreementBillingRules());
     }
 
     /*
@@ -331,263 +143,127 @@ class UpdateRentalAgreementRequest extends FormRequest
     |--------------------------------------------------------------------------
     */
 
-    public function withValidator(
-        $validator
-    ): void {
+    public function withValidator($validator): void
+    {
+        $this->validateAgreementBillingRows($validator);
 
-        $validator->after(
+        $validator->after(function ($validator) {
+            $rental = $this->resolveRentalAgreement();
+            if (! $rental?->agreement) {
+                return;
+            }
 
-            function ($validator) {
+            $agreement = $rental->agreement;
 
-                $agreement = $this->route(
-                    'rentalAgreement'
-                );
-
-                if (! $agreement) {
-
-                    return;
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | Active Agreements Restrictions
-                |--------------------------------------------------------------------------
-                */
-
+            if ($this->filled('end_date')) {
+                $startDate = $this->input('start_date') ?? $agreement->start_date?->toDateString();
                 if (
-
-                    $agreement
-                        ->agreement
-                        ->status
-
-                    === Agreement::STATUS_ACTIVE
-                ) {
-
-                    $restrictedFields = [
-
-                        'apartment_id',
-
-                        'tenant_id',
-
-                        'start_date',
-                    ];
-
-                    foreach (
-
-                        $restrictedFields
-                        as $field
-
-                    ) {
-
-                        if (
-
-                            $this->has($field)
-                        ) {
-
-                            $validator->errors()->add(
-
-                                $field,
-
-                                'This field cannot be modified after agreement activation.'
-                            );
-                        }
-                    }
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | Terminated Agreements Are Read-Only
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-
-                    in_array(
-
-                        $agreement
-                            ->agreement
-                            ->status,
-
-                        [
-
-                            Agreement::STATUS_TERMINATED,
-
-                            Agreement::STATUS_COMPLETED,
-
-                            Agreement::STATUS_CANCELLED,
-                        ]
+                    $startDate
+                    && \Illuminate\Support\Carbon::parse($this->end_date)->lte(
+                        \Illuminate\Support\Carbon::parse($startDate)
                     )
                 ) {
-
-                    $validator->errors()->add(
-
-                        'agreement',
-
-                        'This agreement can no longer be modified.'
-                    );
+                    $validator->errors()->add('end_date', 'End date must be after start date.');
                 }
+            }
 
-                /*
-                |--------------------------------------------------------------------------
-                | Apartment Validation
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-
-                    $this->filled(
-                        'apartment_id'
-                    )
-
-                ) {
-
-                    $apartment = Apartment::query()
-
-                        ->where(
-                            'id',
-                            $this->apartment_id
-                        )
-
-                        ->where(
-                            'company_id',
-                            auth()->user()->company_id
-                        )
-
-                        ->first();
-
-                    if (! $apartment) {
-
-                        return;
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Apartment Must Be Rental Enabled
-                    |--------------------------------------------------------------------------
-                    */
-
-                    if (
-
-                        ! in_array(
-
-                            $apartment->listing_type,
-
-                            [
-
-                                Apartment::TYPE_RENTAL,
-
-                                'hybrid',
-                            ]
-                        )
-                    ) {
-
-                        $validator->errors()->add(
-
-                            'apartment_id',
-
-                            'Selected apartment is not rental-enabled.'
-                        );
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Apartment Cannot Be Sold
-                    |--------------------------------------------------------------------------
-                    */
-
-                    if (
-
-                        $apartment->inventory_status
-                        === Apartment::STATUS_SOLD
-                    ) {
-
-                        $validator->errors()->add(
-
-                            'apartment_id',
-
-                            'Sold apartments cannot have rental agreements.'
-                        );
+            // 1. Active Agreements Restrictions
+            if ($agreement->status === Agreement::STATUS_ACTIVE) {
+                $restrictedFields = ['apartment_id', 'tenant_id', 'start_date'];
+                foreach ($restrictedFields as $field) {
+                    if ($this->has($field)) {
+                        $validator->errors()->add($field, 'This field cannot be modified after agreement activation.');
                     }
                 }
             }
-        );
-    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Custom Messages
-    |--------------------------------------------------------------------------
-    */
+            // 2. Prevent Illegal Status Transitions
+            if ($this->has('status') && $agreement->status !== $this->status) {
+                $finalizedStatuses = [
+                    Agreement::STATUS_TERMINATED,
+                    Agreement::STATUS_COMPLETED,
+                    Agreement::STATUS_CANCELLED,
+                ];
+
+                if (in_array($agreement->status, $finalizedStatuses, true)) {
+                    $validator->errors()->add('status', 'Cannot change status of a finalized agreement.');
+                }
+            }
+
+            // 3. Prevent modification of Terminated/Completed/Cancelled
+            if (in_array($agreement->status, [
+                Agreement::STATUS_TERMINATED,
+                Agreement::STATUS_COMPLETED,
+                Agreement::STATUS_CANCELLED,
+            ], true)) {
+                $validator->errors()->add('agreement', 'This agreement can no longer be modified.');
+            }
+
+            // 4. Apartment Validation
+            if ($this->filled('apartment_id')) {
+                $apartment = Apartment::query()
+                    ->where('id', $this->apartment_id)
+                    ->where('company_id', auth::user()->company_id)
+                    ->first();
+
+                if ($apartment) {
+                    if (!in_array($apartment->listing_type, [Apartment::LISTING_TYPE_RENTAL, 'hybrid'])) {
+                        $validator->errors()->add('apartment_id', 'Selected apartment is not rental-enabled.');
+                    }
+                    if ($apartment->inventory_status === Apartment::STATUS_SOLD) {
+                        $validator->errors()->add('apartment_id', 'Sold apartments cannot have rental agreements.');
+                    }
+                }
+            }
+        });
+    }
 
     public function messages(): array
     {
         return [
-
-            'monthly_rent.gt' =>
-
-                'Monthly rent must be greater than zero.',
-
-            'payment_due_day.between' =>
-
-                'Payment due day must be between 1 and 28.',
-
-            'end_date.after' =>
-
-                'End date must be after start date.',
+            'monthly_rent.gt'         => 'Monthly rent must be greater than zero.',
+            'payment_due_day.between' => 'Payment due day must be between 1 and 28.',
+            'end_date.after'          => 'End date must be after start date.',
         ];
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Sanitization
-    |--------------------------------------------------------------------------
-    */
-
     protected function prepareForValidation(): void
     {
-        $this->merge([
+        $this->normalizeRecurringChargesInput();
 
-            'currency' =>
+        $merge = [
+            'currency' => $this->currency ? strtoupper($this->currency) : null,
+            'security_deposit' => filled($this->security_deposit) ? trim((string) $this->security_deposit) : null,
+        ];
 
-                $this->currency
-                    ? strtoupper($this->currency)
-                    : null,
+        if ($this->has('auto_renew')) {
+            $merge['auto_renew'] = filter_var($this->auto_renew, FILTER_VALIDATE_BOOLEAN);
+        }
 
-            'auto_renew' =>
+        foreach (['includes_water', 'includes_electricity', 'includes_internet'] as $field) {
+            if ($this->has($field)) {
+                $merge[$field] = filter_var($this->{$field}, FILTER_VALIDATE_BOOLEAN);
+            }
+        }
 
-                filter_var(
+        $this->merge($merge);
+    }
 
-                    $this->auto_renew,
+    protected function resolveRentalAgreement(): ?RentalAgreement
+    {
+        $id = $this->route('rental_agreement');
 
-                    FILTER_VALIDATE_BOOLEAN
-                ),
+        if (! $id) {
+            return null;
+        }
 
-            'includes_water' =>
-
-                filter_var(
-
-                    $this->includes_water,
-
-                    FILTER_VALIDATE_BOOLEAN
-                ),
-
-            'includes_electricity' =>
-
-                filter_var(
-
-                    $this->includes_electricity,
-
-                    FILTER_VALIDATE_BOOLEAN
-                ),
-
-            'includes_internet' =>
-
-                filter_var(
-
-                    $this->includes_internet,
-
-                    FILTER_VALIDATE_BOOLEAN
-                ),
-        ]);
+        return RentalAgreement::query()
+            ->with('agreement')
+            ->whereHas(
+                'agreement',
+                fn ($query) => $query->where('company_id', auth()->user()->company_id)
+            )
+            ->where('id', $id)
+            ->first();
     }
 }

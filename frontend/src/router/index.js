@@ -58,14 +58,8 @@ import BuildingOnboarding
 import BuildingsIndex
   from '@/Pages/Buildings/BuildingsIndex.vue'
 
-import BuildingCreate
-  from '@/Pages/Buildings/BuildingCreate.vue'
-
 import BuildingShow
   from '@/Pages/Buildings/BuildingShow.vue'
-
-import BuildingEdit
-  from '@/Pages/Buildings/BuildingEdit.vue'
 
 /*
 |--------------------------------------------------------------------------
@@ -77,14 +71,8 @@ import BuildingEdit
 import ApartmentsIndex
   from '@/Pages/Apartments/ApartmentsIndex.vue'
 
-import ApartmentCreate
-  from '@/Pages/Apartments/ApartmentCreate.vue'
-
 import ApartmentShow
   from '@/Pages/Apartments/ApartmentShow.vue'
-
-import ApartmentEdit
-  from '@/Pages/Apartments/ApartmentEdit.vue'
 
 /*
 |--------------------------------------------------------------------------
@@ -96,11 +84,6 @@ import ApartmentEdit
 import TenantsIndex
   from '@/Pages/Tenants/TenantIndex.vue'
 
-import TenantCreate
-  from '@/Pages/Tenants/TenantCreate.vue'
-
-import TenantEdit
-  from '@/Pages/Tenants/TenantEdit.vue'
 
 /*
 |--------------------------------------------------------------------------
@@ -111,21 +94,13 @@ import TenantEdit
 import RentalAgreementIndex
   from '@/Pages/rentalAgreements/RentalAgreementIndex.vue'
 
-import RentalAgreementCreate
-  from '@/Pages/rentalAgreements/RentalAgreementCreate.vue'
 import RentalAgreementShow
   from '@/Pages/rentalAgreements/RentalAgreementShow.vue'
-import RentalAgreementEdit
-  from '@/Pages/rentalAgreements/RentalAgreementEdit.vue'
   //meter registraiton
   import MeterIndex
   from '@/Pages/meters/MeterIndex.vue'
-import MeterCreate
-  from '@/Pages/meters/MeterCreate.vue'
 import MeterShow
   from '@/Pages/meters/MeterShow.vue'
-import MeterEdit
-  from '@/Pages/meters/MeterEdit.vue'
 
  
 
@@ -139,14 +114,8 @@ import MeterEdit
 import MeterReadingIndex
   from '@/Pages/MeterReading/MeterReadingIndex.vue'
 
-import MeterReadingCreate
-  from '@/Pages/MeterReading/MeterReadingCreate.vue'
-
 import MeterReadingShow
   from '@/Pages/MeterReading/MeterReadingShow.vue'
-
-import MeterReadingEdit
-  from '@/Pages/MeterReading/MeterReadingEdit.vue'
 
 /*
 |--------------------------------------------------------------------------
@@ -156,9 +125,27 @@ import MeterReadingEdit
 
 import InvoicesIndex
   from '@/Pages/Invoices/InvoicesIndex.vue'
+import MonthlyInvoicesWorklist
+  from '@/Pages/Invoices/MonthlyInvoicesWorklist.vue'
+import InvoiceShow
+  from '@/Pages/Invoices/InvoiceShow.vue'
+import InvoiceCreate
+  from '@/Pages/Invoices/InvoiceCreate.vue'
 
 import PaymentsIndex
   from '@/Pages/Payments/PaymentsIndex.vue'
+
+import ChargeApprovalGuide
+  from '@/Pages/Charges/ChargeApprovalGuide.vue'
+
+import ChargeTypeIndex
+  from '@/Pages/ChargeTypes/ChargeTypeIndex.vue'
+import ChargeModelIndex
+  from '@/Pages/ChargeModels/ChargeModelIndex.vue'
+import ChargeModelShow
+  from '@/Pages/ChargeModels/ChargeModelShow.vue'
+import ChargeIndex
+  from '@/Pages/Charges/ChargeIndex.vue'
 
 /*
 |--------------------------------------------------------------------------
@@ -177,6 +164,9 @@ import ReportsIndex
 
 import SettingsIndex
   from '@/Pages/Settings/SettingsIndex.vue'
+
+import FormRouteRedirect
+  from '@/components/forms/FormRouteRedirect.vue'
 
 /*
 |--------------------------------------------------------------------------
@@ -249,6 +239,14 @@ const routes = [
 
     children: [
 
+      {
+        path: '',
+
+        redirect: {
+          name: 'Dashboard',
+        },
+      },
+
       /*
       |--------------------------------------------------------------------------
       | Dashboard
@@ -290,10 +288,12 @@ const routes = [
 
         name: 'BuildingCreate',
 
-        component: BuildingCreate,
+        component: FormRouteRedirect,
 
         meta: {
           title: 'Create Building',
+          listRouteName: 'Buildings',
+          formMode: 'create',
         },
       },
 
@@ -316,12 +316,15 @@ const routes = [
 
         name: 'BuildingEdit',
 
-        component: BuildingEdit,
+        component: FormRouteRedirect,
 
         props: true,
 
         meta: {
           title: 'Edit Building',
+          listRouteName: 'Buildings',
+          formMode: 'edit',
+          formIdParam: 'id',
         },
       },
 
@@ -348,10 +351,12 @@ const routes = [
 
         name: 'ApartmentCreate',
 
-        component: ApartmentCreate,
+        component: FormRouteRedirect,
 
         meta: {
           title: 'Create Apartment',
+          listRouteName: 'Apartments',
+          formMode: 'create',
         },
       },
 
@@ -374,12 +379,15 @@ const routes = [
 
         name: 'ApartmentEdit',
 
-        component: ApartmentEdit,
+        component: FormRouteRedirect,
 
         props: true,
 
         meta: {
           title: 'Edit Apartment',
+          listRouteName: 'Apartments',
+          formMode: 'edit',
+          formIdParam: 'id',
         },
       },
 
@@ -406,10 +414,12 @@ const routes = [
 
         name: 'TenantCreate',
 
-        component: TenantCreate,
+        component: FormRouteRedirect,
 
         meta: {
           title: 'Create Tenant',
+          listRouteName: 'Tenants',
+          formMode: 'create',
         },
       },
 
@@ -418,10 +428,15 @@ const routes = [
 
         name: 'TenantEdit',
 
-        component: TenantEdit,
+        component: FormRouteRedirect,
+
+        props: true,
 
         meta: {
           title: 'Edit Tenant',
+          listRouteName: 'Tenants',
+          formMode: 'edit',
+          formIdParam: 'id',
         },
       },
 
@@ -448,10 +463,12 @@ const routes = [
 
         name: 'RentalAgreementCreate',
 
-        component: RentalAgreementCreate,
+        component: FormRouteRedirect,
 
         meta: {
           title: 'Create Rental Agreement',
+          listRouteName: 'RentalAgreementIndex',
+          formMode: 'create',
         },
       },
 
@@ -472,10 +489,15 @@ const routes = [
 
         name: 'RentalAgreementEdit',
 
-        component: RentalAgreementEdit,
+        component: FormRouteRedirect,
+
+        props: true,
 
         meta: {
           title: 'Edit Rental Agreement',
+          listRouteName: 'RentalAgreementIndex',
+          formMode: 'edit',
+          formIdParam: 'id',
         },
       },
 
@@ -498,11 +520,12 @@ const routes = [
 
         name: 'MeterCreate',
 
-        component: MeterCreate,
+        component: FormRouteRedirect,
 
         meta: {
-
           title: 'Register Meter',
+          listRouteName: 'Meters',
+          formMode: 'create',
         },
       },
 
@@ -524,11 +547,15 @@ const routes = [
 
         name: 'MeterEdit',
 
-        component: MeterEdit,
+        component: FormRouteRedirect,
+
+        props: true,
 
         meta: {
-
           title: 'Edit Meter',
+          listRouteName: 'Meters',
+          formMode: 'edit',
+          formIdParam: 'id',
         },
       },
     
@@ -556,10 +583,12 @@ const routes = [
 
         name: 'MeterReadingCreate',
 
-        component: MeterReadingCreate,
+        component: FormRouteRedirect,
 
         meta: {
           title: 'Capture Meter Reading',
+          listRouteName: 'MeterReadings',
+          formMode: 'create',
         },
       },
 
@@ -580,10 +609,15 @@ const routes = [
 
         name: 'MeterReadingEdit',
 
-        component: MeterReadingEdit,
+        component: FormRouteRedirect,
+
+        props: true,
 
         meta: {
           title: 'Edit Meter Reading',
+          listRouteName: 'MeterReadings',
+          formMode: 'edit',
+          formIdParam: 'id',
         },
       },
 
@@ -594,6 +628,123 @@ const routes = [
       */
 
       {
+        path: 'charge-types',
+
+        name: 'ChargeTypes',
+
+        component: ChargeTypeIndex,
+
+        meta: {
+          title: 'Charge Types',
+        },
+      },
+      {
+        path: 'charge-types/create',
+
+        name: 'ChargeTypeCreate',
+
+        component: FormRouteRedirect,
+
+        meta: {
+          title: 'Create Charge Type',
+          listRouteName: 'ChargeTypes',
+          formMode: 'create',
+        },
+      },
+      {
+        path: 'charge-types/:id/edit',
+
+        name: 'ChargeTypeEdit',
+
+        component: FormRouteRedirect,
+
+        props: true,
+
+        meta: {
+          title: 'Edit Charge Type',
+          listRouteName: 'ChargeTypes',
+          formMode: 'edit',
+          formIdParam: 'id',
+        },
+      },
+
+      {
+        path: 'charge-models',
+
+        name: 'ChargeModels',
+
+        component: ChargeModelIndex,
+
+        meta: {
+          title: 'Charge Models',
+        },
+      },
+      {
+        path: 'charge-models/create',
+
+        name: 'ChargeModelCreate',
+
+        component: FormRouteRedirect,
+
+        meta: {
+          title: 'Create Charge Model',
+          listRouteName: 'ChargeModels',
+          formMode: 'create',
+        },
+      },
+      {
+        path: 'charge-models/:id',
+
+        name: 'ChargeModelShow',
+
+        component: ChargeModelShow,
+
+        meta: {
+          title: 'Charge Model Details',
+        },
+      },
+      {
+        path: 'charge-models/:id/edit',
+
+        name: 'ChargeModelEdit',
+
+        component: FormRouteRedirect,
+
+        props: true,
+
+        meta: {
+          title: 'Edit Charge Model',
+          listRouteName: 'ChargeModels',
+          formMode: 'edit',
+          formIdParam: 'id',
+        },
+      },
+
+      {
+        path: 'charges',
+
+        name: 'Charges',
+
+        component: ChargeIndex,
+
+        meta: {
+          title: 'Utility Charges',
+        },
+      },
+
+      {
+        path: 'charges/approve',
+
+        name: 'ChargeApproval',
+
+        component: ChargeApprovalGuide,
+
+        meta: {
+          title: 'Approve Utility Charges',
+        },
+      },
+
+      {
         path: 'invoices',
 
         name: 'Invoices',
@@ -601,7 +752,43 @@ const routes = [
         component: InvoicesIndex,
 
         meta: {
-          title: 'Invoices',
+          title: 'Billing close',
+        },
+      },
+
+      {
+        path: 'invoices/monthly',
+
+        name: 'MonthlyInvoices',
+
+        component: MonthlyInvoicesWorklist,
+
+        meta: {
+          title: 'Monthly invoices',
+        },
+      },
+
+      {
+        path: 'invoices/create',
+
+        name: 'InvoiceCreate',
+
+        component: InvoiceCreate,
+
+        meta: {
+          title: 'Create invoice',
+        },
+      },
+
+      {
+        path: 'invoices/:id',
+
+        name: 'InvoiceShow',
+
+        component: InvoiceShow,
+
+        meta: {
+          title: 'Invoice detail',
         },
       },
 

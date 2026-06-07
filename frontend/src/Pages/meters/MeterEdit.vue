@@ -175,11 +175,16 @@
           </div>
           <div class="field-group">
             <label class="compact-label">Installation Date</label>
-            <input v-model="form.installation_date" type="date" class="compact-input">
+            <ErpDateInput v-model="form.installation_date" input-class="compact-input" placeholder="Installation date" />
           </div>
           <div class="field-group">
             <label class="compact-label">Inspection Due</label>
-            <input v-model="form.inspection_due_date" type="date" class="compact-input">
+            <ErpDateInput
+              v-model="form.inspection_due_date"
+              input-class="compact-input"
+              placeholder="Inspection due"
+              :min="form.installation_date || ''"
+            />
           </div>
         </div>
 
@@ -242,6 +247,8 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import api from '@/services/api'
+import { ErpDateInput } from '@/components/erp'
+import { useConfirm } from '@/composables/useConfirm'
 
 const route = useRoute()
 const router = useRouter()
@@ -355,7 +362,13 @@ const submitForm = async () => {
 }
 
 const decommissionMeter = async () => {
-  if (!confirm('Are you sure you want to decommission this meter?')) return
+  const { confirm } = useConfirm()
+  const ok = await confirm({
+    title: 'Decommission meter',
+    message: 'This meter will be marked decommissioned. Continue?',
+    confirmLabel: 'Decommission',
+  })
+  if (!ok) return
   try {
     await api.post(`/meters/${route.params.id}/decommission`)
     fetchMeter()

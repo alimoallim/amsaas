@@ -13,6 +13,7 @@ import {
 } from 'vue-router'
 
 import api from '@/services/api'
+import { ErpDateInput } from '@/components/erp'
 
 /*
 |--------------------------------------------------------------------------
@@ -678,19 +679,7 @@ onMounted(async () => {
                     Reading Date
                   </label>
 
-                  <input
-                    v-model="form.reading_date"
-                    type="date"
-                    class="
-                      w-full
-                      rounded-xl
-                      border
-                      border-slate-300
-                      px-4
-                      py-3
-                      text-sm
-                    "
-                  />
+                  <ErpDateInput v-model="form.reading_date" placeholder="Reading date" />
                 </div>
 
                 <!-- Current -->

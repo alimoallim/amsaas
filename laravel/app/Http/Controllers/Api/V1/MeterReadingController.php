@@ -9,7 +9,6 @@ use App\Services\MeterReading\MeterReadingProcessorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Throwable;
 
 class MeterReadingController extends Controller
 {
@@ -280,73 +279,29 @@ class MeterReadingController extends Controller
                 ],
             ]);
 
-        try {
-
-            $service =
-                new MeterReadingProcessorService(
-
-                    $request->user()
-                );
-
-            $reading =
-                $service->process(
-                    $validated
-                );
-
-            $reading->load([
-
-                'meter',
-
-                'building',
-
-                'apartment',
-
-                'reader',
-
-                'approver',
-            ]);
-
-            return response()->json([
-
-                'success' => true,
-
-                'message' =>
-
-                    'Meter reading captured successfully.',
-
-                'data' =>
-
-                    new MeterReadingResource(
-                        $reading
-                    ),
-            ], 201);
-        }
-
-        catch (Throwable $exception) {
-
-            report(
-                $exception
+        $service =
+            new MeterReadingProcessorService(
+                $request->user()
             );
 
-            return response()->json([
+        $reading =
+            $service->process(
+                $validated
+            );
 
-                'success' => false,
+        $reading->load([
+            'meter',
+            'building',
+            'apartment',
+            'reader',
+            'approver',
+        ]);
 
-                'message' =>
-
-                    'Meter reading processing failed.',
-
-                'error' =>
-
-                    app()->environment(
-                        'local'
-                    )
-
-                    ? $exception->getMessage()
-
-                    : 'Unexpected operational failure.',
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Meter reading captured successfully.',
+            'data' => new MeterReadingResource($reading),
+        ], 201);
     }
 
     /*

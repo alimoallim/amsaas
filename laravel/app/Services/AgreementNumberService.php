@@ -1,116 +1,81 @@
 <?php
+
 namespace App\Services;
+
 use App\Models\Agreement;
+use Illuminate\Support\Facades\DB;
+
 class AgreementNumberService
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Generate Agreement Number
-    |--------------------------------------------------------------------------
-    */
+    /**
+     * Allocate a unique agreement number (globally unique column).
+     */
+    public static function allocate(string $agreementType): string
+    {
+        return DB::transaction(function () use ($agreementType) {
+            for ($attempt = 0; $attempt < 10; $attempt++) {
+                $candidate = self::nextCandidate($agreementType);
 
+                $exists = Agreement::withoutGlobalScopes()
+                    ->withTrashed()
+                    ->where('agreement_number', $candidate)
+                    ->exists();
+
+                if (! $exists) {
+                    return $candidate;
+                }
+            }
+
+            throw new \RuntimeException(
+                'Unable to allocate a unique agreement number after multiple attempts.'
+            );
+        });
+    }
+
+    /**
+     * @deprecated Use allocate() for new agreements.
+     */
     public static function generate(
-        string $agreementType
+        string $agreementType,
+        ?string $companyId = null,
     ): string {
+        return self::allocate($agreementType);
+    }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Prefix
-        |--------------------------------------------------------------------------
-        */
-
-        $prefix = match (
-            $agreementType
-        ) {
-
-            Agreement::TYPE_RENTAL =>
-                'RA',
-
-            Agreement::TYPE_SALE =>
-                'SA',
-
-            default =>
-                'AG',
+    protected static function nextCandidate(string $agreementType): string
+    {
+        $prefix = match ($agreementType) {
+            Agreement::TYPE_RENTAL => 'RA',
+            Agreement::TYPE_SALE => 'SA',
+            default => 'AG',
         };
 
-        /*
-        |--------------------------------------------------------------------------
-        | Current Year
-        |--------------------------------------------------------------------------
-        */
-
         $year = now()->format('Y');
+        $pattern = "{$prefix}-{$year}-%";
 
-        /*
-        |--------------------------------------------------------------------------
-        | Latest Agreement
-        |--------------------------------------------------------------------------
-        */
+        $numbers = Agreement::withoutGlobalScopes()
+            ->withTrashed()
+            ->where('agreement_type', $agreementType)
+            ->where('agreement_number', 'like', $pattern)
+            ->lockForUpdate()
+            ->pluck('agreement_number');
 
-        $latestAgreement = Agreement::query()
+        $maxSequence = 0;
 
-            ->where(
-                'agreement_type',
-                $agreementType
-            )
-
-            ->whereYear(
-                'created_at',
-                $year
-            )
-
-            ->latest('created_at')
-
-            ->first();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Extract Sequence
-        |--------------------------------------------------------------------------
-        */
-
-        $nextSequence = 1;
-
-        if (
-
-            $latestAgreement
-            &&
-            $latestAgreement->agreement_number
-
-        ) {
-
-            $parts = explode(
-
-                '-',
-
-                $latestAgreement
-                    ->agreement_number
-            );
-
-            $lastSequence = intval(
-
-                end($parts)
-            );
-
-            $nextSequence =
-                $lastSequence + 1;
+        foreach ($numbers as $number) {
+            $sequence = self::extractSequence($number);
+            if ($sequence > $maxSequence) {
+                $maxSequence = $sequence;
+            }
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Format
-        |--------------------------------------------------------------------------
-        */
+        return sprintf('%s-%s-%05d', $prefix, $year, $maxSequence + 1);
+    }
 
-        return sprintf(
+    protected static function extractSequence(string $agreementNumber): int
+    {
+        $parts = explode('-', $agreementNumber);
 
-            '%s-%s-%05d',
-
-            $prefix,
-
-            $year,
-
-            $nextSequence
-        );
+        return (int) end($parts);
     }
 }

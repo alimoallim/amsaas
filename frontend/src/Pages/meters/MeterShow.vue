@@ -374,6 +374,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import api from '@/services/api'
+import { useConfirm } from '@/composables/useConfirm'
 
 const route = useRoute()
 const loading = ref(true)
@@ -407,8 +408,14 @@ const activateMeter = () => lifecycleAction('activate')
 const markFaulty = () => lifecycleAction('faulty')
 const maintenanceMeter = () => lifecycleAction('maintenance')
 const completeInspection = () => lifecycleAction('inspection/complete')
-const decommissionMeter = () => {
-  if (!confirm('Are you sure you want to decommission this meter?')) return
+const decommissionMeter = async () => {
+  const { confirm } = useConfirm()
+  const ok = await confirm({
+    title: 'Decommission meter',
+    message: 'This meter will be marked decommissioned and removed from active billing. Continue?',
+    confirmLabel: 'Decommission',
+  })
+  if (!ok) return
   lifecycleAction('decommission')
 }
 

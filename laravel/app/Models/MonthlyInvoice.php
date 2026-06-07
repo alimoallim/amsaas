@@ -22,15 +22,16 @@ class MonthlyInvoice extends Model
         'billing_month' => 'integer',
         'issue_date' => 'date',
         'due_date' => 'date',
-        'subtotal_rent' => 'decimal:2',
-        'subtotal_utilities' => 'decimal:2',
-        'subtotal_services' => 'decimal:2',
-        'subtotal_installment' => 'decimal:2',
-        'discount_amount' => 'decimal:2',
-        'paid_amount' => 'decimal:2',
-        'total_amount' => 'decimal:2', // Database Generated Column (Read-Only)
-        'balance_due' => 'decimal:2',  // Database Generated Column (Read-Only)
+        'subtotal_rent' => 'decimal:4',
+        'subtotal_utilities' => 'decimal:4',
+        'subtotal_services' => 'decimal:4',
+        'subtotal_installment' => 'decimal:4',
+        'discount_amount' => 'decimal:4',
+        'paid_amount' => 'decimal:4',
+        'total_amount' => 'decimal:4',
+        'balance_due' => 'decimal:4',
         'finalized_at' => 'datetime',
+        'voided_at' => 'datetime',
     ];
 
     // Relationships

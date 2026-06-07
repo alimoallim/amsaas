@@ -1,5 +1,8 @@
 <?php
+
 namespace App\Models\Scopes;
+
+use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
@@ -9,59 +12,45 @@ class CompanyScope implements Scope
     /**
      * Apply the tenant isolation scope.
      *
-     * Every tenant-owned query automatically
-     * filters records by authenticated user's
-     * company_id.
-     *
-     * Example:
-     *
-     * Building::all()
-     *
-     * Automatically becomes:
-     *
-     * SELECT *
-     * FROM buildings
-     * WHERE company_id = auth()->user()->company_id
+     * Filters by auth()->user()->company_id for HTTP and feature tests.
+     * Skipped in console (migrations, seeders, artisan) except PHPUnit (runningUnitTests).
      */
-    public function apply(
-        Builder $builder,
-        Model $model
-    ): void {
-
+    public function apply(Builder $builder, Model $model): void
+    {
         /*
         |--------------------------------------------------------------------------
-        | Skip scope for:
-        | - Console commands
-        | - Database seeders
-        | - Queue workers without auth context
-        | - Unauthenticated requests
+        | Skip for console / queue without HTTP auth (not PHPUnit feature tests)
         |--------------------------------------------------------------------------
         */
+        if (app()->runningInConsole() && ! app()->runningUnitTests()) {
+            $companyId = TenantContext::currentCompanyId();
 
-        if (
-            app()->runningInConsole() ||
-            !auth()->check()
-        ) {
+            if ($companyId) {
+                $builder->where(
+                    $model->getTable().'.company_id',
+                    $companyId
+                );
+            }
 
             return;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Get authenticated user
-        |--------------------------------------------------------------------------
-        */
+        if (! auth()->check()) {
+            $companyId = TenantContext::currentCompanyId();
+
+            if ($companyId) {
+                $builder->where(
+                    $model->getTable().'.company_id',
+                    $companyId
+                );
+            }
+
+            return;
+        }
 
         $user = auth()->user();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Safety check
-        |--------------------------------------------------------------------------
-        */
-
-        if (!$user) {
-
+        if (! $user) {
             return;
         }
 
@@ -69,51 +58,20 @@ class CompanyScope implements Scope
         |--------------------------------------------------------------------------
         | System Admin Bypass
         |--------------------------------------------------------------------------
-        |
-        | SYSTEM_ADMIN users can access
-        | all tenant records globally.
-        |
-        | Future enterprise expansion:
-        | - support platform analytics
-        | - support support-engineer tooling
-        | - support global administration
-        |--------------------------------------------------------------------------
         */
-
         if (
             isset($user->role) &&
             $user->role === 'SYSTEM_ADMIN'
         ) {
-
             return;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Enforce company isolation
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            empty($user->company_id)
-        ) {
-
-            abort(
-                403,
-                'Tenant context missing.'
-            );
+        if (empty($user->company_id)) {
+            abort(403, 'Tenant context missing.');
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Apply WHERE company_id = ?
-        |--------------------------------------------------------------------------
-        */
-
         $builder->where(
-
-            $model->getTable() . '.company_id',
-
+            $model->getTable().'.company_id',
             $user->company_id
         );
     }

@@ -1,20 +1,19 @@
 <template>
-  <div class="p-8">
-    
-    <div class="bg-white rounded-3xl shadow-sm p-8">
-      
-      <h1 class="text-3xl font-bold text-slate-800">
-        Settings
-      </h1>
-
-      <p class="mt-2 text-slate-500">
-        Manage company settings and preferences.
-      </p>
-
-    </div>
-
+  <div class="erp-page">
+    <ErpPanel>
+      <PageHeader
+        eyebrow="System"
+        title="Settings"
+        description="Company preferences and platform configuration."
+      />
+      <EmptyState
+        title="Settings"
+        description="Company profile and billing defaults will be configured here."
+      />
+    </ErpPanel>
   </div>
 </template>
 
 <script setup>
+import { PageHeader, ErpPanel, EmptyState } from '@/components/erp'
 </script>

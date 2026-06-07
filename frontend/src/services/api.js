@@ -19,15 +19,6 @@ const api = axios.create({
   },
 })
 
-/*
-|--------------------------------------------------------------------------
-| Request Interceptor
-|--------------------------------------------------------------------------
-|
-| Automatically attach bearer token
-|
-*/
-
 api.interceptors.request.use(
 
   (config) => {
@@ -54,47 +45,19 @@ api.interceptors.request.use(
   }
 )
 
-/*
-|--------------------------------------------------------------------------
-| Response Interceptor
-|--------------------------------------------------------------------------
-*/
-
 api.interceptors.response.use(
 
   (response) => response,
 
   (error) => {
 
-    /*
-    |--------------------------------------------------------------------------
-    | Unauthorized
-    |--------------------------------------------------------------------------
-    */
-
     if (
       error.response?.status === 401
     ) {
 
-      console.error(
-        'Unauthorized'
-      )
-
-      /*
-      |--------------------------------------------------------------------------
-      | Clear invalid session
-      |--------------------------------------------------------------------------
-      */
-
       localStorage.removeItem(
         'token'
       )
-
-      /*
-      |--------------------------------------------------------------------------
-      | Redirect login
-      |--------------------------------------------------------------------------
-      */
 
       if (
         window.location.pathname
@@ -109,29 +72,6 @@ api.interceptors.response.use(
     return Promise.reject(
       error
     )
-  }
-)
-api.interceptors.request.use(
-
-  (config) => {
-
-    const token =
-      localStorage.getItem('token')
-
-    console.log('TOKEN:', token)
-
-    if (token) {
-
-      config.headers.Authorization =
-        `Bearer ${token}`
-    }
-
-    console.log(
-      'AUTH HEADER:',
-      config.headers.Authorization
-    )
-
-    return config
   }
 )
 

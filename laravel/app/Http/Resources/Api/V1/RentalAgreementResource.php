@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Models\ChargeModel;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -280,13 +281,7 @@ class RentalAgreementResource extends JsonResource
 
                             $this->agreement
                                 ?->tenant
-                                ?->full_display_name
-
-                            ??
-
-                            $this->agreement
-                                ?->tenant
-                                ?->display_name,
+                                ?->full_display_name ?: null,
 
                         'email' =>
 
@@ -422,6 +417,22 @@ class RentalAgreementResource extends JsonResource
 
             /*
             |--------------------------------------------------------------------------
+            | Recurring billing (agreement charges)
+            |--------------------------------------------------------------------------
+            */
+
+            'billing' => $this->when(
+                $this->includeDetailPayload($request),
+                fn () => $this->billingPayload(),
+            ),
+
+            'utility_usage' => $this->when(
+                $this->includeDetailPayload($request),
+                fn () => $this->utilityUsagePayload(),
+            ),
+
+            /*
+            |--------------------------------------------------------------------------
             | Renewal Policy
             |--------------------------------------------------------------------------
             */
@@ -518,6 +529,81 @@ class RentalAgreementResource extends JsonResource
                         $this->updated_at
                     )->toDateTimeString(),
             ],
+
+            'controls' => $this->agreementControls(),
+        ];
+    }
+
+    /**
+     * @return array<string, bool>
+     */
+    private function agreementControls(): array
+    {
+        $agreement = $this->agreement;
+        $status = $agreement?->status;
+
+        $finalized = in_array($status, [
+            \App\Models\Agreement::STATUS_TERMINATED,
+            \App\Models\Agreement::STATUS_COMPLETED,
+            \App\Models\Agreement::STATUS_CANCELLED,
+        ], true);
+
+        $machine = app(\App\Services\Agreements\AgreementStateMachine::class);
+
+        return [
+            'can_edit' => $agreement && ! $finalized,
+            'can_delete' => $status === \App\Models\Agreement::STATUS_DRAFT,
+            'can_approve' => $agreement
+                && $machine->canTransition($agreement, \App\Models\Agreement::STATUS_APPROVED),
+            'can_activate' => $agreement
+                && $status !== \App\Models\Agreement::STATUS_ACTIVE
+                && ($agreement->canBeActivated() ?? false)
+                && $machine->canTransition($agreement, \App\Models\Agreement::STATUS_ACTIVE),
+            'can_terminate' => $status === \App\Models\Agreement::STATUS_ACTIVE,
+        ];
+    }
+
+    protected function includeDetailPayload(Request $request): bool
+    {
+        return $request->routeIs('rental-agreements.show');
+    }
+
+    protected function utilityUsagePayload(): array
+    {
+        return app(\App\Services\Billing\AgreementUtilityUsageService::class)
+            ->summarize($this->resource);
+    }
+
+    protected function billingPayload(): array
+    {
+        $charges = $this->agreement?->relationLoaded('agreementCharges')
+            ? $this->agreement->agreementCharges
+            : collect();
+
+        $rentCharge = $charges->first(function ($charge) {
+            $strategy = $charge->chargeModel?->pricing_strategy;
+
+            return $strategy === ChargeModel::STRATEGY_AGREEMENT_RENT;
+        });
+
+        $recurring = $charges
+            ->filter(function ($charge) use ($rentCharge) {
+                if ($rentCharge && $charge->id === $rentCharge->id) {
+                    return false;
+                }
+
+                $strategy = $charge->chargeModel?->pricing_strategy;
+
+                return $strategy !== ChargeModel::STRATEGY_AGREEMENT_RENT;
+            })
+            ->values();
+
+        return [
+            'rent_charge_model_id' => $rentCharge?->charge_model_id,
+            'rent_charge' => $rentCharge
+                ? new AgreementChargeResource($rentCharge)
+                : null,
+            'recurring_charges' => AgreementChargeResource::collection($recurring),
         ];
     }
 }

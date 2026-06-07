@@ -83,10 +83,19 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            $table->string(
-                'invoice_number',
-                50
-            )->unique();
+  
+
+/*
+            |--------------------------------------------------------------------------
+            | Invoice Identity
+            |--------------------------------------------------------------------------
+            */
+
+            // 1. Define the column first
+            $table->string('invoice_number', 50); 
+
+            // 2. Then define the index
+            $table->unique(['company_id', 'invoice_number'], 'uq_invoice_per_company');
 
             $table->string(
                 'reference_number',

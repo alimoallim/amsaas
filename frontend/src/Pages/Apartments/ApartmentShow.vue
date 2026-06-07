@@ -589,6 +589,7 @@ import {
 } from 'vue-router'
 
 import api from '../../services/api'
+import { useConfirm } from '@/composables/useConfirm'
 
 import DashboardLayout from '../../layouts/DashboardLayout.vue'
 
@@ -929,10 +930,12 @@ const fetchApartment = async () => {
 */
 
 const deleteApartment = async () => {
-
-  const confirmed = confirm(
-    'Are you sure you want to delete this apartment?'
-  )
+  const { confirm } = useConfirm()
+  const confirmed = await confirm({
+    title: 'Delete apartment',
+    message: 'Are you sure you want to delete this apartment? This cannot be undone.',
+    confirmLabel: 'Delete',
+  })
 
   if (!confirmed) return
 

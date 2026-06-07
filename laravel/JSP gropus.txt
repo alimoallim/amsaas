@@ -1,0 +1,51 @@
+1.Abdinajib ali dahir
+2.Ikran
+3.Zaynab
+4.Ramlo
+5.ahmed hassan husein
+6.Muniro
+7.Ridwan
+8.said abdullahi
+9.usama
+10.abdirahman dahir
+11.Asad Ahmed
+12.Harun
+13.Abdihafid
+14.Abdibasid
+
+
+
+------------Mahdi--------------
+
+2................Jamac..................
+1.Abdihafid
+2.Ismail
+3.Abdibasid
+..................
+
+-----------------Abdirisaq--------------
+1.Harun
+2.Abdirisaq
+3.Abdirisaq ibrahim
+4.Asad
+------------------------Liban----------------
+1.liban
+2.Ramlo
+3.Abdinajib
+4.Hussein
+5.Sadam
+6.Abdullahi Mahdi
+-------------------Fartun---------------
+1.Hafsa osma
+2.Nafiso
+3.Fartun
+4.Suweys
+5.Halimo
+----------------------Saynab---------------------
+1.Ridwan
+2.Muniro
+3.Hani
+4.Ikran
+5.Safiyo
+
+

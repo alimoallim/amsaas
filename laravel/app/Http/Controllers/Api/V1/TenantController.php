@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\StoreTenantRequest;
 use App\Http\Requests\Api\V1\UpdateTenantRequest;
 use App\Http\Resources\Api\V1\TenantResource;
+use App\Models\Agreement;
 use App\Models\Tenant;
+use App\Services\Property\TenantLeaseEligibilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -14,6 +16,9 @@ use Illuminate\Support\Str;
 
 class TenantController extends Controller
 {
+    public function __construct(
+        private readonly TenantLeaseEligibilityService $leaseEligibility,
+    ) {}
     /*
     |--------------------------------------------------------------------------
     | List Tenants
@@ -108,6 +113,19 @@ class TenantController extends Controller
                         'status',
                         $status
                     );
+                }
+            )
+
+            ->when(
+                $request->filled('building_id'),
+                function ($query) use ($request) {
+                    $buildingId = $request->string('building_id');
+                    $query->whereHas('agreements', function ($agreementQuery) use ($buildingId) {
+                        $agreementQuery
+                            ->where('status', Agreement::STATUS_ACTIVE)
+                            ->whereHas('apartment', fn ($apartmentQuery) => $apartmentQuery
+                                ->where('building_id', $buildingId));
+                    });
                 }
             )
 
@@ -360,11 +378,7 @@ class TenantController extends Controller
             'Unauthorized access.'
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Soft Delete
-        |--------------------------------------------------------------------------
-        */
+        $this->leaseEligibility->assertCanDelete($tenant);
 
         $tenant->delete();
 

@@ -1,92 +1,93 @@
 <template>
-    <div
-        class="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300"
-    >
-        <!-- Loading State -->
-        <DashboardSkeleton
-            v-if="loading"
+  <div class="erp-page">
+    <ErpPanel>
+      <PageHeader
+        eyebrow="Overview"
+        :title="dashboard.user?.name ? `Welcome, ${dashboard.user.name}` : 'Dashboard'"
+        description="Operational snapshot — portfolio health, financials, and items needing attention."
+      />
+    </ErpPanel>
+
+    <DashboardSkeleton v-if="loading" />
+
+    <template v-else>
+      <KpiStrip v-if="dashboard.portfolio">
+        <KpiCard
+          label="Buildings"
+          :value="dashboard.portfolio.buildings_count ?? '—'"
+          caption="In portfolio"
         />
+        <KpiCard
+          label="Occupancy"
+          :value="(dashboard.portfolio.occupancy_rate != null ? dashboard.portfolio.occupancy_rate + '%' : '—')"
+          caption="Portfolio average"
+        />
+        <KpiCard
+          label="Outstanding"
+          :value="formatMoney(dashboard.financials?.outstanding_receivables)"
+          caption="Receivables"
+          variant="accent"
+        />
+        <KpiCard
+          label="Collected (MTD)"
+          :value="formatMoney(dashboard.financials?.collected_mtd)"
+          caption="Month to date"
+        />
+      </KpiStrip>
 
-        <template v-else>
+      <AlertBanner
+        v-for="(alert, i) in dashboard.alerts"
+        :key="i"
+        :message="alert.message || alert.title"
+        :variant="alert.type === 'error' ? 'error' : alert.type === 'warning' ? 'warning' : 'info'"
+        :dismissible="false"
+        class="mb-0"
+      />
 
-            <!-- Header -->
-            <DashboardHeader
-                :user="dashboard.user"
-            />
+      <div class="grid gap-5 lg:grid-cols-2">
+        <ErpPanel title="Executive KPIs" subtitle="Portfolio metrics">
+          <ExecutiveKpiCards :portfolio="dashboard.portfolio" />
+        </ErpPanel>
+        <ErpPanel title="Financial KPIs" subtitle="Billing and collections">
+          <FinancialKpiCards :financials="dashboard.financials" />
+        </ErpPanel>
+      </div>
 
-            <!-- Alerts -->
-            <AlertPanel
-                :alerts="dashboard.alerts"
-            />
-
-            <!-- Executive KPIs -->
-            <ExecutiveKpiCards
-                :portfolio="dashboard.portfolio"
-            />
-
-            <!-- Financial KPIs -->
-            <FinancialKpiCards
-                :financials="dashboard.financials"
-            />
-
-            <!-- Quick Actions -->
-            <QuickActions />
-
-        </template>
-    </div>
+      <ErpPanel title="Quick actions">
+        <QuickActions />
+      </ErpPanel>
+    </template>
+  </div>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
 import api from '@/services/api'
-
-import DashboardHeader from '../components/DashboardHeader.vue'
+import { PageHeader, ErpPanel, KpiCard, KpiStrip, AlertBanner } from '@/components/erp'
 import ExecutiveKpiCards from '../components/ExecutiveKpiCards.vue'
 import FinancialKpiCards from '../components/FinancialKpiCards.vue'
-import AlertPanel from '../components/AlertPanel.vue'
 import DashboardSkeleton from '../components/DashboardSkeleton.vue'
 import QuickActions from '../components/QuickActions.vue'
 
 const loading = ref(true)
+const dashboard = ref({ user: {}, alerts: [], portfolio: {}, financials: {} })
 
-const dashboard = ref({
-
-    user: {},
-
-    alerts: [],
-
-    portfolio: {},
-
-    financials: {}
-})
-
-const fetchDashboard = async () => {
-
-    loading.value = true
-
-    try {
-
-        const { data } = await api.get(
-            '/dashboard'
-        )
-
-        dashboard.value = data
-    }
-    catch (error) {
-
-        console.error(
-            'Dashboard load failed',
-            error
-        )
-    }
-    finally {
-
-        loading.value = false
-    }
+function formatMoney(v) {
+  if (v == null) return '—'
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(v))
 }
 
-onMounted(() => {
+const fetchDashboard = async () => {
+  loading.value = true
+  try {
+    const { data } = await api.get('/dashboard')
+    dashboard.value = data
+  } catch (error) {
+    console.error('Dashboard load failed', error)
+  } finally {
+    loading.value = false
+  }
+}
 
-    fetchDashboard()
-})
+onMounted(fetchDashboard)
 </script>

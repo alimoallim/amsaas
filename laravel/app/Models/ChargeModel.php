@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Traits\BelongsToCompany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,6 +12,7 @@ class ChargeModel extends Model
 {
     use HasFactory;
     use SoftDeletes;
+    use BelongsToCompany;
 
     /*
     |--------------------------------------------------------------------------
@@ -180,6 +182,14 @@ class ChargeModel extends Model
     const STRATEGY_FIXED =
         'fixed';
 
+    /** Monthly rent taken from the linked rental agreement (not stored on this model). */
+    const STRATEGY_AGREEMENT_RENT =
+        'agreement_rent';
+
+    /** Flat recurring fee; amount is set on each agreement charge line. */
+    const STRATEGY_FLAT_FEE =
+        'flat_fee';
+
     const STRATEGY_METERED =
         'metered';
 
@@ -193,6 +203,10 @@ class ChargeModel extends Model
         'formula';
 
     const STRATEGIES = [
+
+        self::STRATEGY_AGREEMENT_RENT,
+
+        self::STRATEGY_FLAT_FEE,
 
         self::STRATEGY_FIXED,
 
@@ -322,13 +336,6 @@ class ChargeModel extends Model
     |--------------------------------------------------------------------------
     */
 
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(
-            Company::class
-        );
-    }
-
     public function chargeType(): BelongsTo
     {
         return $this->belongsTo(
@@ -384,6 +391,24 @@ class ChargeModel extends Model
     {
         return $this->pricing_strategy ===
             self::STRATEGY_FIXED;
+    }
+
+    public function usesAgreementRent(): bool
+    {
+        return $this->pricing_strategy ===
+            self::STRATEGY_AGREEMENT_RENT;
+    }
+
+    public function usesFlatFee(): bool
+    {
+        return in_array(
+            $this->pricing_strategy,
+            [
+                self::STRATEGY_FLAT_FEE,
+                self::STRATEGY_FIXED,
+            ],
+            true
+        );
     }
 
     public function supportsProration(): bool

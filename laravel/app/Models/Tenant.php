@@ -105,11 +105,9 @@ class Tenant extends Model
         );
     }
 
-    public function rentalAgreements(): HasMany
+    public function agreements(): HasMany
     {
-        return $this->hasMany(
-            RentalAgreement::class
-        );
+        return $this->hasMany(Agreement::class);
     }
 
     public function payments(): HasMany
@@ -127,16 +125,11 @@ class Tenant extends Model
 
     public function getFullDisplayNameAttribute(): string
     {
-        return $this->display_name
-            ?? trim(
+        $display = trim((string) ($this->display_name ?? ''));
+        if ($display !== '') {
+            return $display;
+        }
 
-                collect([
-
-                    $this->first_name,
-                    $this->middle_name,
-                    $this->last_name,
-
-                ])->filter()->implode(' ')
-            );
+        return trim(collect([$this->first_name, $this->last_name])->filter()->implode(' '));
     }
 }

@@ -1,0 +1,22 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - phpstan-baseline.neon
+
+parameters:
+    paths:
+        - app/
+    level: 6
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: false
+
+    ignoreErrors:
+        # Legacy duplicate invoice stack — deprecated in favour of MonthlyInvoice
+        - '#App\\Models\\Invoice#'
+        - message: '#PHPDoc tag @var#'
+          path: app/Http/Controllers/*
+
+    excludePaths:
+        - app/actions/*
+
+    bootstrapFiles:
+        - vendor/larastan/larastan/bootstrap.php
