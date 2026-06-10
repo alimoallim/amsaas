@@ -404,8 +404,14 @@ export function billingFieldsForApi(form) {
 /**
  * JSON body for create / update (non-multipart).
  */
-export function buildRentalAgreementPayload(form, { isActive = false, forUpdate = false } = {}) {
+export function buildRentalAgreementPayload(
+  form,
+  { forUpdate = false, confirmCriticalChanges = false } = {},
+) {
   const payload = {
+    apartment_id: form.apartment_id,
+    tenant_id: form.tenant_id,
+    start_date: form.start_date,
     end_date: form.end_date || null,
     monthly_rent: form.monthly_rent,
     security_deposit: form.security_deposit === '' || form.security_deposit == null
@@ -415,6 +421,8 @@ export function buildRentalAgreementPayload(form, { isActive = false, forUpdate 
     payment_due_day: form.payment_due_day,
     auto_renew: form.auto_renew,
     renewal_notice_days: form.renewal_notice_days,
+    notes: form.notes || null,
+    special_terms: form.special_terms || null,
     ...billingFieldsForApi(form),
   }
 
@@ -422,10 +430,8 @@ export function buildRentalAgreementPayload(form, { isActive = false, forUpdate 
     payload.status = form.status || 'draft'
   }
 
-  if (!isActive) {
-    payload.apartment_id = form.apartment_id
-    payload.tenant_id = form.tenant_id
-    payload.start_date = form.start_date
+  if (confirmCriticalChanges) {
+    payload.confirm_critical_changes = true
   }
 
   return payload

@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Exceptions\BusinessRuleException;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Api\V1\ApartmentOwnershipHistoryResource;
 use App\Http\Resources\Api\V1\ApartmentResource;
 use App\Models\Apartment;
+use App\Models\ApartmentOwnershipHistory;
 use App\Services\Property\ApartmentInventoryService;
 use App\Services\Property\BuildingPortfolioService;
 use Illuminate\Http\JsonResponse;
@@ -295,21 +297,25 @@ class ApartmentController extends Controller
             ],
 
             'market_rent_price' => [
-
+                Rule::requiredIf(in_array(
+                    $request->input('listing_type'),
+                    [Apartment::LISTING_TYPE_RENTAL, Apartment::LISTING_TYPE_HYBRID],
+                    true
+                )),
                 'nullable',
-
                 'numeric',
-
-                'min:0',
+                'min:0.01',
             ],
 
             'market_sale_price' => [
-
+                Rule::requiredIf(in_array(
+                    $request->input('listing_type'),
+                    [Apartment::LISTING_TYPE_SALE, Apartment::LISTING_TYPE_HYBRID],
+                    true
+                )),
                 'nullable',
-
                 'numeric',
-
-                'min:0',
+                'min:0.01',
             ],
 
             'security_deposit' => [
@@ -392,80 +398,6 @@ class ApartmentController extends Controller
                 'message' =>
 
                     'Apartment unit already exists in this building.',
-            ], 422);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Rental Validation
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-
-            in_array(
-
-                $validated['listing_type'],
-
-                [
-
-                    Apartment::LISTING_TYPE_RENTAL,
-
-                    Apartment::LISTING_TYPE_HYBRID,
-                ]
-            )
-
-            &&
-
-            empty(
-                $validated['market_rent_price']
-            )
-        ) {
-
-            return response()->json([
-
-                'success' => false,
-
-                'message' =>
-
-                    'Market rent price is required for rental-capable apartments.',
-            ], 422);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Sale Validation
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-
-            in_array(
-
-                $validated['listing_type'],
-
-                [
-
-                    Apartment::LISTING_TYPE_SALE,
-
-                    Apartment::LISTING_TYPE_HYBRID,
-                ]
-            )
-
-            &&
-
-            empty(
-                $validated['market_sale_price']
-            )
-        ) {
-
-            return response()->json([
-
-                'success' => false,
-
-                'message' =>
-
-                    'Market sale price is required for sale-capable apartments.',
             ], 422);
         }
 
@@ -564,10 +496,14 @@ class ApartmentController extends Controller
             'data' =>
 
                 new ApartmentResource(
-
-                    $apartment->load(
-                        'building'
-                    )
+                    $apartment
+                        ->load(['building', 'activeLease'])
+                        ->loadCount([
+                            'agreements as blocking_leases_count' => fn ($q) => $q->whereIn(
+                                'status',
+                                ApartmentInventoryService::LEASE_BLOCKING_STATUSES
+                            ),
+                        ])
                 ),
         ]);
     }
@@ -753,11 +689,13 @@ class ApartmentController extends Controller
             );
         }
 
-        if (isset($validated['inventory_status'])) {
+        $inventoryStatus = $validated['inventory_status'] ?? null;
+        if ($inventoryStatus !== null) {
             $this->inventory->assertInventoryStatusChangeAllowed(
                 $apartment,
-                $validated['inventory_status'],
+                $inventoryStatus,
             );
+            unset($validated['inventory_status']);
         }
 
         DB::beginTransaction();
@@ -771,6 +709,14 @@ class ApartmentController extends Controller
             $apartment->update(
                 $validated
             );
+
+            if ($inventoryStatus !== null && $apartment->inventory_status !== $inventoryStatus) {
+                $this->inventory->transitionStatus(
+                    $apartment,
+                    $inventoryStatus,
+                    'Manual inventory update',
+                );
+            }
 
             DB::commit();
 
@@ -991,6 +937,40 @@ class ApartmentController extends Controller
                         )
 
                         ->count(),
+            ],
+        ]);
+    }
+
+    public function ownershipHistory(Request $request, string $apartment): JsonResponse
+    {
+        $unit = Apartment::query()
+            ->where('company_id', $request->user()->company_id)
+            ->where('id', $apartment)
+            ->first();
+
+        if (! $unit) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Apartment not found.',
+            ], 404);
+        }
+
+        $history = ApartmentOwnershipHistory::query()
+            ->with(['buyer', 'saleAgreement.agreement', 'recordedBy'])
+            ->where('apartment_id', $unit->id)
+            ->orderByDesc('transfer_date')
+            ->orderByDesc('created_at')
+            ->paginate($request->integer('per_page', 20));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Ownership history retrieved.',
+            'data' => ApartmentOwnershipHistoryResource::collection($history),
+            'meta' => [
+                'current_page' => $history->currentPage(),
+                'last_page' => $history->lastPage(),
+                'per_page' => $history->perPage(),
+                'total' => $history->total(),
             ],
         ]);
     }

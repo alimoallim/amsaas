@@ -25,7 +25,7 @@
         v-if="invoice?.controls?.can_void"
         variant="ghost"
         size="sm"
-        class="text-red-700"
+        class="text-red-700 dark:text-red-400"
         :loading="acting === 'void'"
         @click="onVoid"
       >
@@ -37,47 +37,52 @@
       <AlertBanner v-if="pageError" variant="error" class="mb-4" :message="pageError" @dismiss="pageError = ''" />
       <AlertBanner v-if="pageMessage" variant="success" class="mb-4" :message="pageMessage" @dismiss="pageMessage = ''" />
 
-      <div v-if="loading" class="py-10 text-center text-sm text-slate-500">Loading invoice…</div>
+      <div v-if="loading" class="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Loading invoice…</div>
 
       <template v-else-if="invoice">
         <KpiStrip class="grid-cols-2 lg:grid-cols-4">
           <KpiCard label="Total" :value="formatMoney(invoice.total_amount)" />
           <KpiCard label="Paid" :value="formatMoney(invoice.paid_amount)" />
           <KpiCard label="Balance due" :value="formatMoney(invoice.balance_due)" variant="accent" />
-          <KpiCard label="Status">
-            <StatusBadge :status="invoice.status" :label="invoice.status" />
-          </KpiCard>
+          <div class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/20">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</p>
+            <div class="mt-2">
+              <StatusBadge :status="invoice.status" :label="invoice.status" />
+            </div>
+          </div>
         </KpiStrip>
 
         <div class="mt-6 grid gap-4 lg:grid-cols-3">
-          <section class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-1">
-            <h2 class="text-sm font-semibold text-slate-800">Billing context</h2>
-            <dl class="mt-3 space-y-2 text-sm text-slate-600">
+          <ErpPanel title="Billing context" class="lg:col-span-1">
+            <dl class="space-y-2 text-sm text-slate-600 dark:text-slate-400">
               <div class="flex justify-between gap-3">
                 <dt>Period</dt>
-                <dd class="font-medium text-slate-900">{{ invoice.billing_period }}</dd>
+                <dd class="font-medium text-slate-900 dark:text-slate-100">{{ invoice.billing_period }}</dd>
               </div>
               <div class="flex justify-between gap-3">
                 <dt>Issue date</dt>
-                <dd>{{ invoice.issue_date || '—' }}</dd>
+                <dd class="text-slate-700 dark:text-slate-300">{{ invoice.issue_date || '—' }}</dd>
               </div>
               <div class="flex justify-between gap-3">
                 <dt>Due date</dt>
-                <dd>{{ invoice.due_date || '—' }}</dd>
+                <dd class="text-slate-700 dark:text-slate-300">{{ invoice.due_date || '—' }}</dd>
               </div>
               <div class="flex justify-between gap-3">
                 <dt>Unit</dt>
-                <dd>{{ invoice.apartment?.unit_number || '—' }}</dd>
+                <dd class="text-slate-700 dark:text-slate-300">{{ invoice.apartment?.unit_number || '—' }}</dd>
               </div>
               <div class="flex justify-between gap-3">
                 <dt>Building</dt>
-                <dd>{{ invoice.building?.name || '—' }}</dd>
+                <dd class="text-slate-700 dark:text-slate-300">{{ invoice.building?.name || '—' }}</dd>
               </div>
               <div class="flex justify-between gap-3">
                 <dt>Tenant</dt>
-                <dd>{{ tenantLabel }}</dd>
+                <dd class="text-slate-700 dark:text-slate-300">{{ tenantLabel }}</dd>
               </div>
-              <div v-if="invoice.void_reason" class="rounded-lg bg-red-50 px-3 py-2 text-red-800">
+              <div
+                v-if="invoice.void_reason"
+                class="rounded-lg bg-red-50 px-3 py-2 text-red-800 dark:border dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300"
+              >
                 <p class="text-xs font-semibold uppercase tracking-wide">Void reason</p>
                 <p class="mt-1">{{ invoice.void_reason }}</p>
               </div>
@@ -91,12 +96,10 @@
                 View rental agreement
               </ErpButton>
             </div>
-          </section>
+          </ErpPanel>
 
-          <section class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2">
-            <h2 class="text-sm font-semibold text-slate-800">Line items</h2>
+          <ErpPanel title="Line items" :no-padding="true" class="lg:col-span-2">
             <DataTable
-              class="mt-3"
               :columns="lineColumns"
               :rows="invoice.line_items || []"
               :loading="false"
@@ -114,46 +117,64 @@
               </template>
             </DataTable>
 
-            <div class="mt-4 grid gap-1 border-t border-slate-100 pt-4 text-sm">
-              <div class="flex justify-between"><span>Rent</span><span class="font-mono">{{ formatMoney(invoice.subtotal_rent) }}</span></div>
-              <div class="flex justify-between"><span>Utilities</span><span class="font-mono">{{ formatMoney(invoice.subtotal_utilities) }}</span></div>
-              <div class="flex justify-between"><span>Services</span><span class="font-mono">{{ formatMoney(invoice.subtotal_services) }}</span></div>
-              <div v-if="Number(invoice.discount_amount) > 0" class="flex justify-between text-emerald-700">
-                <span>Discount</span><span class="font-mono">−{{ formatMoney(invoice.discount_amount) }}</span>
+            <template #footer>
+              <div class="grid gap-1 text-sm text-slate-600 dark:text-slate-400">
+                <div class="flex justify-between">
+                  <span>Rent</span>
+                  <span class="font-mono text-slate-800 dark:text-slate-200">{{ formatMoney(invoice.subtotal_rent) }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>Utilities</span>
+                  <span class="font-mono text-slate-800 dark:text-slate-200">{{ formatMoney(invoice.subtotal_utilities) }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>Services</span>
+                  <span class="font-mono text-slate-800 dark:text-slate-200">{{ formatMoney(invoice.subtotal_services) }}</span>
+                </div>
+                <div
+                  v-if="Number(invoice.discount_amount) > 0"
+                  class="flex justify-between text-emerald-700 dark:text-emerald-400"
+                >
+                  <span>Discount</span>
+                  <span class="font-mono">−{{ formatMoney(invoice.discount_amount) }}</span>
+                </div>
+                <div class="flex justify-between border-t border-slate-200 pt-2 font-semibold text-slate-900 dark:border-slate-700 dark:text-slate-100">
+                  <span>Total</span>
+                  <span class="font-mono">{{ formatMoney(invoice.total_amount) }}</span>
+                </div>
               </div>
-              <div class="flex justify-between border-t border-slate-100 pt-2 font-semibold text-slate-900">
-                <span>Total</span><span class="font-mono">{{ formatMoney(invoice.total_amount) }}</span>
-              </div>
-            </div>
-          </section>
+            </template>
+          </ErpPanel>
         </div>
 
-        <section
+        <ErpPanel
           v-if="invoice.payment_allocations?.length"
-          class="mt-4 rounded-xl border border-slate-200 bg-white p-4"
+          title="Payment history"
+          :no-padding="true"
+          class="mt-4"
         >
-          <h2 class="text-sm font-semibold text-slate-800">Payment history</h2>
           <DataTable
-            class="mt-3"
             :columns="paymentColumns"
             :rows="invoice.payment_allocations"
             :loading="false"
             empty-title="No payments"
           >
             <template #cell-receipt="{ row }">
-              <code class="text-xs font-mono">{{ row.payment?.receipt_number || '—' }}</code>
+              <code class="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                {{ row.payment?.receipt_number || '—' }}
+              </code>
             </template>
             <template #cell-payment_date="{ row }">
-              <span class="text-sm">{{ row.payment?.payment_date || '—' }}</span>
+              <span class="text-sm text-slate-700 dark:text-slate-300">{{ row.payment?.payment_date || '—' }}</span>
             </template>
             <template #cell-payment_method="{ row }">
-              <span class="text-sm">{{ row.payment?.payment_method || '—' }}</span>
+              <span class="text-sm text-slate-700 dark:text-slate-300">{{ row.payment?.payment_method || '—' }}</span>
             </template>
             <template #cell-amount_allocated="{ row }">
-              <span class="font-mono text-sm tabular-nums">{{ formatMoney(row.amount_allocated) }}</span>
+              <span class="font-mono text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ formatMoney(row.amount_allocated) }}</span>
             </template>
           </DataTable>
-        </section>
+        </ErpPanel>
       </template>
     </template>
   </WorklistLayout>
@@ -172,6 +193,7 @@ import {
   StatusBadge,
   KpiCard,
   KpiStrip,
+  ErpPanel,
   AlertBanner,
 } from '@/components/erp'
 

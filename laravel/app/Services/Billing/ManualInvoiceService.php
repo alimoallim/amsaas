@@ -102,6 +102,7 @@ class ManualInvoiceService
 
                 InvoiceLineItem::create([
                     'monthly_invoice_id' => $invoice->id,
+                    'charge_type_id' => $row['charge_type_id'] ?? null,
                     'line_type' => $row['line_type'],
                     'description' => $row['description'],
                     'quantity' => $quantity,

@@ -14,6 +14,13 @@ class InvoiceLineItemResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'charge_type_id' => $this->charge_type_id,
+            'charge_type' => $this->whenLoaded('chargeType', fn () => [
+                'id' => $this->chargeType?->id,
+                'code' => $this->chargeType?->code,
+                'name' => $this->chargeType?->name,
+                'ledger_account_code' => $this->chargeType?->ledger_account_code,
+            ]),
             'line_type' => $this->line_type,
             'description' => $this->description,
             'quantity' => $this->quantity,

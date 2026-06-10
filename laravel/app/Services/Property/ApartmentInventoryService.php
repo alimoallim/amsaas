@@ -5,6 +5,8 @@ namespace App\Services\Property;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Agreement;
 use App\Models\Apartment;
+use App\Models\ApartmentInventoryStatusLog;
+use Illuminate\Support\Facades\Auth;
 
 class ApartmentInventoryService
 {
@@ -37,6 +39,50 @@ class ApartmentInventoryService
     /**
      * @throws BusinessRuleException
      */
+    public function assertCanSell(Apartment $apartment): void
+    {
+        if (! $apartment->canBeSold()) {
+            throw new BusinessRuleException(
+                'Apartment is not listed for sale or is not in a sellable inventory status.',
+                'APARTMENT_NOT_SELLABLE',
+            );
+        }
+
+        if ($apartment->inventory_status === Apartment::STATUS_OCCUPIED) {
+            throw new BusinessRuleException(
+                'Cannot sell a unit that is currently occupied.',
+                'APARTMENT_OCCUPIED',
+            );
+        }
+
+        if ($this->hasConflictingLease($apartment)) {
+            throw new BusinessRuleException(
+                'Cannot sell a unit with an active or draft rental agreement.',
+                'APARTMENT_ACTIVE_LEASE',
+            );
+        }
+    }
+
+    /**
+     * @throws BusinessRuleException
+     */
+    public function assertCanReserveForSale(Apartment $apartment): void
+    {
+        $this->assertCanSell($apartment);
+
+        if (! in_array($apartment->inventory_status, [
+            Apartment::STATUS_AVAILABLE,
+        ], true)) {
+            throw new BusinessRuleException(
+                'Only available units can be reserved for sale.',
+                'APARTMENT_NOT_AVAILABLE_FOR_SALE',
+            );
+        }
+    }
+
+    /**
+     * @throws BusinessRuleException
+     */
     public function assertNoConflictingLease(
         Apartment $apartment,
         ?string $exceptAgreementId = null,
@@ -55,6 +101,7 @@ class ApartmentInventoryService
     ): bool {
         return Agreement::query()
             ->where('apartment_id', $apartment->id)
+            ->where('agreement_type', Agreement::TYPE_RENTAL)
             ->whereIn('status', self::LEASE_BLOCKING_STATUSES)
             ->when(
                 $exceptAgreementId,
@@ -80,26 +127,82 @@ class ApartmentInventoryService
         }
     }
 
-    public function markReserved(Apartment $apartment): void
+    public function markReserved(Apartment $apartment, ?string $reason = null): void
     {
         if ($apartment->inventory_status === Apartment::STATUS_AVAILABLE) {
-            $apartment->update([
-                'inventory_status' => Apartment::STATUS_RESERVED,
-            ]);
+            $this->transitionStatus($apartment, Apartment::STATUS_RESERVED, $reason ?? 'Rental draft created');
         }
     }
 
-    public function occupy(Apartment $apartment): void
+    public function markReservedForSale(Apartment $apartment, ?string $reason = null): void
     {
-        $apartment->update([
-            'inventory_status' => Apartment::STATUS_OCCUPIED,
-        ]);
+        $this->assertCanReserveForSale($apartment);
+        $this->transitionStatus($apartment, Apartment::STATUS_RESERVED, $reason ?? 'Sale reservation');
     }
 
-    public function release(Apartment $apartment): void
+    public function markUnderContract(Apartment $apartment, ?string $reason = null): void
     {
-        $apartment->update([
-            'inventory_status' => Apartment::STATUS_AVAILABLE,
+        $this->assertCanSell($apartment);
+        $this->transitionStatus($apartment, Apartment::STATUS_UNDER_CONTRACT, $reason ?? 'Sale contract executed');
+    }
+
+    public function markSold(Apartment $apartment, ?string $reason = null): void
+    {
+        $this->transitionStatus($apartment, Apartment::STATUS_SOLD, $reason ?? 'Ownership transferred');
+    }
+
+    public function occupy(Apartment $apartment, ?string $reason = null): void
+    {
+        $this->transitionStatus($apartment, Apartment::STATUS_OCCUPIED, $reason ?? 'Lease activated');
+    }
+
+    public function release(Apartment $apartment, ?string $reason = null): void
+    {
+        $this->transitionStatus($apartment, Apartment::STATUS_AVAILABLE, $reason ?? 'Unit released');
+    }
+
+    /**
+     * Optimistic-lock status transition with audit log.
+     *
+     * @throws BusinessRuleException
+     */
+    public function transitionStatus(
+        Apartment $apartment,
+        string $newStatus,
+        ?string $reason = null,
+    ): void {
+        if ($apartment->inventory_status === $newStatus) {
+            return;
+        }
+
+        $fromStatus = $apartment->inventory_status;
+        $expectedVersion = (int) $apartment->lock_version;
+
+        $updated = Apartment::query()
+            ->where('id', $apartment->id)
+            ->where('lock_version', $expectedVersion)
+            ->update([
+                'inventory_status' => $newStatus,
+                'lock_version' => $expectedVersion + 1,
+            ]);
+
+        if ($updated === 0) {
+            throw new BusinessRuleException(
+                'Inventory was updated by another process. Please refresh and try again.',
+                'INVENTORY_VERSION_CONFLICT',
+            );
+        }
+
+        $apartment->refresh();
+
+        ApartmentInventoryStatusLog::create([
+            'company_id' => $apartment->company_id,
+            'apartment_id' => $apartment->id,
+            'from_status' => $fromStatus,
+            'to_status' => $newStatus,
+            'reason' => $reason,
+            'changed_by' => Auth::id(),
+            'created_at' => now(),
         ]);
     }
 
@@ -149,6 +252,13 @@ class ApartmentInventoryService
                 'Cannot mark unit as occupied without an active rental agreement.',
                 'APARTMENT_NO_ACTIVE_LEASE',
             );
+        }
+
+        if (
+            in_array($newStatus, [Apartment::STATUS_UNDER_CONTRACT, Apartment::STATUS_SOLD], true)
+            && in_array($apartment->listing_type, [Apartment::LISTING_TYPE_SALE, Apartment::LISTING_TYPE_HYBRID], true)
+        ) {
+            $this->assertCanSell($apartment);
         }
     }
 }

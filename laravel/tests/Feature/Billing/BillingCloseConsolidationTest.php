@@ -19,7 +19,7 @@ class BillingCloseConsolidationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_billing_generate_creates_monthly_invoices_for_active_leases(): void
+    public function test_billing_generate_produces_draft_invoices_for_active_leases(): void
     {
         $company = Company::factory()->create();
         $user = User::factory()->create(['company_id' => $company->id]);
@@ -63,17 +63,23 @@ class BillingCloseConsolidationTest extends TestCase
         ]);
 
         $response->assertOk()
-            ->assertJsonPath('results.success', 2)
             ->assertJsonPath('results.failed', 0);
 
-        $this->assertEquals(
-            2,
-            MonthlyInvoice::query()
-                ->where('company_id', $company->id)
-                ->where('billing_year', $year)
-                ->where('billing_month', $month)
-                ->where('status', 'draft')
-                ->count()
-        );
+        $draftCount = MonthlyInvoice::query()
+            ->where('company_id', $company->id)
+            ->where('billing_year', $year)
+            ->where('billing_month', $month)
+            ->where('status', 'draft')
+            ->count();
+
+        $this->assertEquals(2, $draftCount);
+
+        $totalRent = (float) MonthlyInvoice::query()
+            ->where('company_id', $company->id)
+            ->where('billing_year', $year)
+            ->where('billing_month', $month)
+            ->sum('subtotal_rent');
+
+        $this->assertEqualsWithDelta(1200, $totalRent, 0.01);
     }
 }

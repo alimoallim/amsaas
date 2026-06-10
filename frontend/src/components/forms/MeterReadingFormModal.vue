@@ -9,7 +9,12 @@
     @close="$emit('close')"
     @save="onSave"
   >
-    <MeterReadingFormContent ref="formRef" :entity-id="entityId" @saved="onSaved" />
+    <MeterReadingFormContent
+      ref="formRef"
+      :entity-id="entityId"
+      @saved="onSaved"
+      @edit-existing="(id) => emit('edit-existing', id)"
+    />
   </FormModal>
 </template>
 
@@ -19,7 +24,7 @@ import { FormModal } from '@/components/erp'
 import MeterReadingFormContent from './MeterReadingFormContent.vue'
 
 const props = defineProps({ open: Boolean, entityId: { default: null } })
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close', 'saved', 'edit-existing'])
 const formRef = ref(null)
 const saving = ref(false)
 const isEdit = computed(() => props.entityId != null)

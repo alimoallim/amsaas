@@ -580,7 +580,18 @@
       .te-layout { display: grid; grid-template-columns: 220px 1fr; gap: 18px; align-items: start; }
       @media (max-width: 900px) {
         .te-layout { grid-template-columns: 1fr; }
-        .te-sidebar { flex-direction: row; overflow-x: auto; }
+        .te-sidebar {
+          display: flex;
+          flex-direction: row;
+          overflow-x: auto;
+          gap: 6px;
+          position: static;
+        }
+        .te-sidebar > nav { display: flex; flex-direction: row; gap: 6px; }
+        .te-nav-item { flex-direction: column; padding: 10px 12px; min-width: 90px; }
+        .te-nav-text { display: none; }
+        .te-summary-card,
+        .te-danger-zone { display: none; }
       }
 
       /* Sidebar */
@@ -693,6 +704,40 @@
       .te-field--span4 { grid-column: span 4; }
       @media (max-width: 1100px) { .te-field--span4 { grid-column: span 2; } }
       @media (max-width: 720px)  { .te-field--span2, .te-field--span4 { grid-column: span 1; } }
+
+      @media (max-width: 720px) {
+        .te-root { padding: 16px; }
+        .te-title { font-size: 24px; }
+        .te-title-row { flex-wrap: wrap; }
+        .te-progress-wrap { min-width: 100%; max-width: 100%; }
+        .te-section-header { padding: 16px; }
+        .te-section-title { font-size: 17px; }
+        .te-grid { padding: 16px; }
+        .te-subsection { margin: 0 16px 16px; }
+        .te-legal-notice { margin: 0 16px 4px; }
+        .te-form-footer {
+          flex-direction: column-reverse;
+          align-items: stretch;
+          padding: 16px;
+        }
+        .te-footer-right {
+          flex-direction: column;
+          width: 100%;
+        }
+        .te-footer-hint { text-align: center; }
+        .te-btn-ghost,
+        .te-btn-primary,
+        .te-btn-submit,
+        .te-btn-danger {
+          width: 100%;
+          justify-content: center;
+        }
+        .te-input,
+        .te-select {
+          font-size: 16px;
+          min-height: 44px;
+        }
+      }
 
       /* Fields */
       .te-field { display: flex; flex-direction: column; }

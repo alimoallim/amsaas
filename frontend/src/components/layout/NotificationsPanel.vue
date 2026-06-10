@@ -1,15 +1,15 @@
 <template>
 
   <div
-    class="absolute right-0 top-14 w-80 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+    class="absolute right-0 top-14 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
   >
 
     <div
-      class="px-4 py-3 border-b border-slate-100"
+      class="border-b border-slate-100 px-4 py-3 dark:border-slate-700"
     >
 
       <h3
-        class="font-semibold text-slate-800"
+        class="font-semibold text-slate-800 dark:text-slate-100"
       >
         Notifications
       </h3>

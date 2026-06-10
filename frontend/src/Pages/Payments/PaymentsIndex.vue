@@ -92,7 +92,12 @@
           <ErpButton @click="openRecordModal">Record payment</ErpButton>
         </template>
         <template #cell-receipt_number="{ row }">
-          <code class="text-xs font-mono">{{ row.receipt_number }}</code>
+          <RouterLink
+            :to="{ name: 'PaymentShow', params: { id: row.id } }"
+            class="font-mono text-xs text-blue-700 hover:underline"
+          >
+            {{ row.receipt_number }}
+          </RouterLink>
         </template>
         <template #cell-tenant="{ row }">
           <span class="font-medium">{{ tenantDisplayName(row.tenant) || '—' }}</span>
@@ -129,13 +134,20 @@
   <ErpModal
     :open="recordModal"
     title="Record payment"
-    subtitle="Payment is allocated to the tenant's oldest open invoices (FIFO)."
+    :subtitle="recordModalSubtitle"
     confirm-label="Record payment"
     :loading="saving"
     @close="closeRecordModal"
     @confirm="submitPayment"
   >
     <div class="mt-3 space-y-4">
+      <FormField label="Payment type" required :error="fieldError('payment_purpose')">
+        <select v-model="form.payment_purpose" class="erp-select">
+          <option value="rent">Rent (FIFO to open invoices)</option>
+          <option value="security_deposit">Security deposit received</option>
+          <option value="deposit_refund">Security deposit refund</option>
+        </select>
+      </FormField>
       <FormField label="Building" required :error="fieldError('building_id')">
         <ErpSearchSelect
           v-model="form.building_id"
@@ -160,8 +172,40 @@
         />
       </FormField>
 
+      <FormField
+        v-if="isDepositPayment"
+        label="Rental agreement"
+        required
+        :error="fieldError('agreement_id')"
+      >
+        <select
+          v-model="form.agreement_id"
+          class="erp-select"
+          :disabled="!form.tenant_id || agreementsLoading"
+        >
+          <option value="">
+            {{ agreementsLoading ? 'Loading agreements…' : 'Select agreement…' }}
+          </option>
+          <option v-for="a in tenantAgreements" :key="a.id" :value="a.id">
+            {{ a.agreement_number }}
+            <template v-if="a.financials?.security_deposit">
+              · deposit {{ formatMoney(a.financials.security_deposit) }}
+            </template>
+          </option>
+        </select>
+        <p
+          v-if="selectedAgreementLedger && !agreementsLoading"
+          class="mt-1 text-xs text-slate-500"
+        >
+          Available deposit: {{ formatMoney(selectedAgreementLedger.available) }}
+          <span v-if="selectedAgreementLedger.required > 0">
+            · required {{ formatMoney(selectedAgreementLedger.required) }}
+          </span>
+        </p>
+      </FormField>
+
       <div
-        v-if="form.tenant_id"
+        v-if="form.tenant_id && !isDepositPayment"
         class="rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-3"
       >
         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -259,6 +303,37 @@
           <option value="cheque">Cheque</option>
         </select>
       </FormField>
+      <FormField
+        label="Receipt account"
+        :hint="receiptAccountHint"
+        :error="fieldError('receipt_account_code')"
+      >
+        <p v-if="!form.receipt_account_override" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          {{ defaultReceiptAccountLabel }}
+        </p>
+        <select
+          v-else
+          v-model="form.receipt_account_code"
+          class="erp-select"
+        >
+          <option value="">Select account…</option>
+          <option
+            v-for="account in receiptAccounts"
+            :key="account.code"
+            :value="account.code"
+          >
+            {{ account.code }} — {{ account.name }}
+          </option>
+        </select>
+        <label class="mt-2 flex items-center gap-2 text-sm text-slate-600">
+          <input
+            v-model="form.receipt_account_override"
+            type="checkbox"
+            class="rounded border-slate-300"
+          />
+          Override default receipt account
+        </label>
+      </FormField>
       <FormField label="Reference" :error="fieldError('reference_number')">
         <input v-model="form.reference_number" type="text" class="erp-input" placeholder="Transfer ref, cheque #…" />
       </FormField>
@@ -271,7 +346,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, RouterLink } from 'vue-router'
 import api from '@/services/api'
 import { usePayments } from '@/composables/usePayments'
 import { useTenantPicker } from '@/composables/useTenantPicker'
@@ -314,6 +389,52 @@ const pageSuccess = ref('')
 const pageSuccessVariant = ref('success')
 const fieldErrors = ref({})
 const collectBannerDismissed = ref(false)
+const rentalAgreements = ref([])
+const agreementsLoading = ref(false)
+const receiptAccounts = ref([])
+const receiptDefaultsByMethod = ref({})
+const receiptOptionsLoading = ref(false)
+
+const isDepositPayment = computed(
+  () => form.payment_purpose === 'security_deposit' || form.payment_purpose === 'deposit_refund',
+)
+
+const defaultReceiptAccount = computed(() => {
+  const code = receiptDefaultsByMethod.value[form.payment_method]
+  return receiptAccounts.value.find((account) => account.code === code) ?? null
+})
+
+const defaultReceiptAccountLabel = computed(() => {
+  const account = defaultReceiptAccount.value
+  if (!account) return 'Loading receipt account…'
+  return `${account.code} — ${account.name}`
+})
+
+const receiptAccountHint = computed(() => {
+  if (form.receipt_account_override) {
+    return 'Journal debit will post to the selected asset account instead of the method default.'
+  }
+  return 'Mapped from payment method. Enable override to choose a different receipt account.'
+})
+
+const recordModalSubtitle = computed(() => {
+  if (form.payment_purpose === 'security_deposit') {
+    return 'Posts to customer deposits liability (2120). Does not reduce rent invoices.'
+  }
+  if (form.payment_purpose === 'deposit_refund') {
+    return 'Releases deposit liability (2120) back to the receipt account.'
+  }
+  return "Payment is allocated to the tenant's oldest open invoices (FIFO)."
+})
+
+const tenantAgreements = computed(() =>
+  rentalAgreements.value.filter((a) => a.tenant?.id === form.tenant_id),
+)
+
+const selectedAgreementLedger = computed(() => {
+  const match = tenantAgreements.value.find((a) => a.id === form.agreement_id)
+  return match?.financials?.deposit_ledger ?? null
+})
 
 const billingPeriod = reactive({
   year: Number(route.query.year) || new Date().getFullYear(),
@@ -456,19 +577,84 @@ watch(
   },
 )
 
+async function loadRentalAgreements() {
+  agreementsLoading.value = true
+  try {
+    const { data } = await api.get('/rental-agreements', { params: { per_page: 100 } })
+    rentalAgreements.value = data.data ?? []
+  } catch {
+    rentalAgreements.value = []
+  } finally {
+    agreementsLoading.value = false
+  }
+}
+
+watch(
+  () => form.payment_purpose,
+  (purpose) => {
+    if (purpose === 'security_deposit' || purpose === 'deposit_refund') {
+      form.agreement_id = ''
+      loadRentalAgreements()
+    } else {
+      form.agreement_id = ''
+    }
+  },
+)
+
 watch(
   () => form.tenant_id,
   (tenantId) => {
     if (!tenantId) {
       tenantBalance.value = null
+      form.agreement_id = ''
       return
     }
-    fetchTenantBalance({
-      tenantId,
-      buildingId: form.building_id || undefined,
-    }).catch(() => {
-      /* balance panel stays empty */
-    })
+    if (!isDepositPayment.value) {
+      fetchTenantBalance({
+        tenantId,
+        buildingId: form.building_id || undefined,
+      }).catch(() => {
+        /* balance panel stays empty */
+      })
+    }
+    if (isDepositPayment.value && tenantAgreements.value.length === 1) {
+      form.agreement_id = tenantAgreements.value[0].id
+    }
+  },
+)
+
+async function loadReceiptAccountOptions() {
+  receiptOptionsLoading.value = true
+  try {
+    const { data } = await api.get('/payments/receipt-account-options')
+    const payload = data.data ?? data
+    receiptAccounts.value = payload.accounts ?? []
+    receiptDefaultsByMethod.value = payload.defaults_by_method ?? {}
+  } catch {
+    receiptAccounts.value = []
+    receiptDefaultsByMethod.value = {}
+  } finally {
+    receiptOptionsLoading.value = false
+  }
+}
+
+watch(
+  () => form.payment_method,
+  () => {
+    if (!form.receipt_account_override) {
+      form.receipt_account_code = ''
+    }
+  },
+)
+
+watch(
+  () => form.receipt_account_override,
+  (enabled) => {
+    if (!enabled) {
+      form.receipt_account_code = ''
+      return
+    }
+    form.receipt_account_code = defaultReceiptAccount.value?.code ?? ''
   },
 )
 
@@ -478,6 +664,7 @@ function openRecordModal() {
   pageError.value = ''
   recordModal.value = true
   fetchBuildings('', { ensureId: form.building_id || undefined })
+  loadReceiptAccountOptions()
 }
 
 function closeRecordModal() {
@@ -513,8 +700,16 @@ async function submitPayment() {
     fieldErrors.value = { tenant_id: ['Select a tenant.'] }
     return
   }
+  if (isDepositPayment.value && !form.agreement_id) {
+    fieldErrors.value = { agreement_id: ['Select a rental agreement.'] }
+    return
+  }
   if (!form.amount || Number(form.amount) <= 0) {
     fieldErrors.value = { amount: ['Enter a valid amount.'] }
+    return
+  }
+  if (form.receipt_account_override && !form.receipt_account_code) {
+    fieldErrors.value = { receipt_account_code: ['Select a receipt account.'] }
     return
   }
   try {

@@ -29,6 +29,7 @@ export function useMeterReadings() {
       const { data } = await api.get('/meter-readings', {
         params: {
           page,
+          per_page: filters.per_page || undefined,
           search: filters.search || undefined,
           status: filters.status || undefined,
           utility_type: filters.utility_type || undefined,
@@ -55,6 +56,14 @@ export function useMeterReadings() {
     await fetchList(meta.value.current_page)
   }
 
+  async function bulkApprove(readingIds) {
+    const { data } = await api.post('/meter-readings/bulk-approve', {
+      reading_ids: readingIds,
+    })
+    await fetchList(meta.value.current_page)
+    return data.data ?? data
+  }
+
   async function reject(reading, reason) {
     await api.post(`/meter-readings/${reading.id}/reject`, { reason })
     await fetchList(meta.value.current_page)
@@ -75,6 +84,7 @@ export function useMeterReadings() {
     summary,
     fetchList,
     approve,
+    bulkApprove,
     reject,
     resetFilters,
   }

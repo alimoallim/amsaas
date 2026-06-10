@@ -5,10 +5,14 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\StoreTenantRequest;
 use App\Http\Requests\Api\V1\UpdateTenantRequest;
+use App\Http\Resources\Api\V1\MonthlyInvoiceResource;
 use App\Http\Resources\Api\V1\TenantResource;
 use App\Models\Agreement;
 use App\Models\Tenant;
+use App\Services\Billing\MonthlyInvoiceListService;
+use App\Services\Billing\TenantBillingService;
 use App\Services\Property\TenantLeaseEligibilityService;
+use App\Support\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -257,6 +261,58 @@ class TenantController extends Controller
     | Show Tenant
     |--------------------------------------------------------------------------
     */
+
+    public function billing(
+        Request $request,
+        Tenant $tenant,
+    ): JsonResponse {
+        abort_if(
+            $tenant->company_id !== $request->user()->company_id,
+            403,
+            'Unauthorized access.'
+        );
+
+        $validated = $request->validate([
+            'year' => 'nullable|integer|between:2020,2050',
+            'month' => 'nullable|integer|between:1,12',
+            'status' => 'nullable|string|in:draft,issued,finalized,partially_paid,paid,overdue,cancelled',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:10|max:100',
+        ]);
+
+        TenantContext::setCompanyId((string) $request->user()->company_id);
+
+        $billing = app(TenantBillingService::class, ['user' => $request->user()])
+            ->billingHistory($tenant, $validated);
+
+        $paginator = $billing['paginator'];
+        $listService = app(MonthlyInvoiceListService::class, ['user' => $request->user()]);
+        $agreements = $listService->agreementsForInvoices($paginator->items());
+
+        foreach ($paginator->items() as $invoice) {
+            $agreement = $agreements->get($invoice->contract_id);
+            if ($agreement) {
+                $invoice->setRelation('resolvedAgreement', $agreement);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'tenant' => new TenantResource($tenant),
+                'summary' => $billing['summary'],
+                'invoices' => MonthlyInvoiceResource::collection($paginator),
+            ],
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+            ],
+        ]);
+    }
 
     public function show(
         Request $request,

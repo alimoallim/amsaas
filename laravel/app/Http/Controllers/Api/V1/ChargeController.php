@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\ChargeResource;
 use App\Models\Charge;
 use App\Services\Billing\ChargeWorkflowService;
+use App\Support\TenantContext;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,8 @@ class ChargeController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Charge::class);
+
+        TenantContext::setCompanyId((string) $request->user()->company_id);
 
         $query = Charge::query()
             ->where('company_id', $request->user()->company_id)
@@ -45,17 +48,20 @@ class ChargeController extends Controller
             });
         }
 
-        $paginated = $query->paginate($request->integer('per_page', 15));
+        $perPage = min(100, max(10, $request->integer('per_page', 20)));
+        $paginated = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
             'message' => 'Charges retrieved successfully.',
-            'data' => ChargeResource::collection($paginated),
+            'data' => ChargeResource::collection($paginated->items())->resolve(),
             'meta' => [
                 'current_page' => $paginated->currentPage(),
                 'last_page' => $paginated->lastPage(),
                 'per_page' => $paginated->perPage(),
                 'total' => $paginated->total(),
+                'from' => $paginated->firstItem(),
+                'to' => $paginated->lastItem(),
             ],
         ]);
     }
@@ -125,6 +131,7 @@ class ChargeController extends Controller
         $this->authorize('viewAny', Charge::class);
 
         $companyId = $request->user()->company_id;
+        TenantContext::setCompanyId((string) $companyId);
 
         $base = Charge::query()
             ->where('company_id', $companyId)

@@ -6,11 +6,13 @@ use App\Exceptions\BusinessRuleException;
 use App\Models\Agreement;
 use App\Models\AgreementCharge;
 use App\Models\Apartment;
+use App\Models\MonthlyInvoice;
 use App\Models\RentalAgreement;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\AgreementNumberService;
 use App\Services\Agreements\AgreementStateMachine;
+use App\Services\Billing\AgreementBillingResyncService;
 use App\Services\Billing\AgreementChargeSyncService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -98,12 +100,16 @@ class RentalAgreementService
                 $data['rent_charge_model_id'] ?? null,
             );
 
-            return $rental->load([
+            $rental = $rental->fresh()->load([
                 'agreement.apartment.building',
                 'agreement.tenant',
                 'agreement.agreementCharges.chargeModel',
                 'agreement.agreementCharges.chargeType',
             ]);
+
+            $this->resyncInvoicesIfActive($actor, $rental);
+
+            return $rental;
         });
     }
 
@@ -195,8 +201,10 @@ class RentalAgreementService
                 $this->applyStatusChange($agreement, $data['status'], $actor);
             }
 
+            $this->applyCoreFieldUpdates($actor, $agreement, $data);
+            $agreement->refresh();
+
             $agreementPayload = array_filter([
-                'start_date' => $data['start_date'] ?? null,
                 'end_date' => array_key_exists('end_date', $data) ? $data['end_date'] : null,
                 'signed_at' => $data['signed_at'] ?? null,
                 'contract_amount' => $data['contract_amount'] ?? null,
@@ -242,12 +250,16 @@ class RentalAgreementService
                 );
             }
 
-            return $rental->fresh()->load([
+            $rental = $rental->fresh()->load([
                 'agreement.apartment.building',
                 'agreement.tenant',
                 'agreement.agreementCharges.chargeModel',
                 'agreement.agreementCharges.chargeType',
             ]);
+
+            $this->resyncInvoicesIfActive($actor, $rental);
+
+            return $rental;
         });
     }
 
@@ -383,6 +395,99 @@ class RentalAgreementService
                 'AGREEMENT_FINALIZED',
             );
         }
+    }
+
+    /**
+     * Apply unit, tenant, and start-date corrections (including on active agreements).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function applyCoreFieldUpdates(User $actor, Agreement $agreement, array $data): void
+    {
+        if (array_key_exists('tenant_id', $data) && $data['tenant_id'] !== $agreement->tenant_id) {
+            $tenant = Tenant::query()
+                ->where('id', $data['tenant_id'])
+                ->where('company_id', $actor->company_id)
+                ->firstOrFail();
+
+            $this->tenantEligibility->assertCanSignLease($tenant);
+
+            $agreement->update([
+                'tenant_id' => $tenant->id,
+                'updated_by' => $actor->id,
+            ]);
+        }
+
+        if (array_key_exists('apartment_id', $data) && $data['apartment_id'] !== $agreement->apartment_id) {
+            $newApartment = Apartment::query()
+                ->where('id', $data['apartment_id'])
+                ->where('company_id', $actor->company_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $oldApartment = $agreement->apartment;
+
+            $this->inventory->assertRentable($newApartment);
+            $this->inventory->assertNoConflictingLease($newApartment, $agreement->id);
+
+            if ($agreement->status === Agreement::STATUS_ACTIVE) {
+                $this->inventory->assertCanActivate($newApartment);
+
+                if ($oldApartment) {
+                    $this->inventory->release($oldApartment);
+                }
+
+                $this->inventory->occupy($newApartment);
+            } elseif ($agreement->status !== Agreement::STATUS_ACTIVE) {
+                if (
+                    $oldApartment
+                    && ! $this->inventory->hasConflictingLease($oldApartment, $agreement->id)
+                ) {
+                    $this->inventory->release($oldApartment);
+                }
+
+                if ($agreement->status === Agreement::STATUS_DRAFT) {
+                    $this->inventory->markReserved($newApartment);
+                }
+            }
+
+            $agreement->update([
+                'apartment_id' => $newApartment->id,
+                'updated_by' => $actor->id,
+            ]);
+
+            MonthlyInvoice::query()
+                ->where('company_id', $actor->company_id)
+                ->where('contract_type', 'rental')
+                ->where('contract_id', $agreement->id)
+                ->where('status', 'draft')
+                ->update(['apartment_id' => $newApartment->id]);
+        }
+
+        if (array_key_exists('start_date', $data)) {
+            $newStart = $data['start_date'];
+            $currentStart = $agreement->start_date?->toDateString();
+
+            if ($newStart !== $currentStart) {
+                $agreement->update([
+                    'start_date' => $newStart,
+                    'updated_by' => $actor->id,
+                ]);
+
+                AgreementCharge::query()
+                    ->where('agreement_id', $agreement->id)
+                    ->update(['billing_start_date' => $newStart]);
+            }
+        }
+    }
+
+    private function resyncInvoicesIfActive(User $actor, RentalAgreement $rental): void
+    {
+        if ($rental->agreement?->status !== Agreement::STATUS_ACTIVE) {
+            return;
+        }
+
+        app(AgreementBillingResyncService::class)->resyncAfterAgreementChange($actor, $rental);
     }
 
     private function resolveForCompany(

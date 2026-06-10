@@ -95,6 +95,16 @@
             </RouterLink>
 
             <button
+              v-if="reading.controls.can_edit"
+              type="button"
+              class="mr-btn-ghost"
+              @click="showEditModal = true"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit reading
+            </button>
+
+            <button
               v-if="reading.controls.can_approve"
               @click="approveReading"
               :disabled="approving"
@@ -896,7 +906,12 @@
       .mr-toast-fade-enter-from, .mr-toast-fade-leave-to { opacity:0; transform:translateY(10px); }
     </component>
 
-  
+    <MeterReadingFormModal
+      :open="showEditModal"
+      :entity-id="route.params.id"
+      @close="showEditModal = false"
+      @saved="onReadingSaved"
+    />
 </template>
 
 <script setup>
@@ -904,6 +919,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import api from '@/services/api'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
+import MeterReadingFormModal from '@/components/forms/MeterReadingFormModal.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -915,6 +931,7 @@ const rejecting       = ref(false)
 const reading         = ref(null)
 const rejectionReason = ref('')
 const showRejectModal = ref(false)
+const showEditModal = ref(false)
 
 /*──────── Toast ────────*/
 const toast = ref({ show: false, message: '', type: 'success' })
@@ -937,6 +954,12 @@ const fetchReading = async () => {
   } finally {
     loading.value = false
   }
+}
+
+async function onReadingSaved() {
+  showEditModal.value = false
+  await fetchReading()
+  showToast('Reading updated. Re-approve if utility charges should be regenerated.', 'success')
 }
 
 /*──────── Approve ────────*/

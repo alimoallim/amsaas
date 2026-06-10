@@ -710,6 +710,38 @@
       @media (max-width: 1100px) { .tc-field--span4 { grid-column: span 2; } }
       @media (max-width: 720px)  { .tc-field--span2, .tc-field--span4 { grid-column: span 1; } }
 
+      @media (max-width: 720px) {
+        .tc-root { padding: 16px; }
+        .tc-title { font-size: 24px; }
+        .tc-progress-wrap { min-width: 100%; max-width: 100%; }
+        .tc-section-header { padding: 16px; }
+        .tc-section-title { font-size: 17px; }
+        .tc-grid { padding: 16px; }
+        .tc-subsection { margin: 0 16px 16px; }
+        .tc-legal-notice { margin: 0 16px 4px; }
+        .tc-form-footer {
+          flex-direction: column-reverse;
+          align-items: stretch;
+          padding: 16px;
+        }
+        .tc-footer-right {
+          flex-direction: column;
+          width: 100%;
+        }
+        .tc-footer-hint { text-align: center; }
+        .tc-btn-ghost,
+        .tc-btn-primary,
+        .tc-btn-submit {
+          width: 100%;
+          justify-content: center;
+        }
+        .tc-input,
+        .tc-select {
+          font-size: 16px;
+          min-height: 44px;
+        }
+      }
+
       /* Fields */
       .tc-field { display: flex; flex-direction: column; }
       .tc-field--error .tc-label { color: var(--c-red); }

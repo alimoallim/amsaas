@@ -19,6 +19,13 @@
     </template>
 
     <template #kpis>
+      <AlertBanner
+        v-if="error"
+        variant="error"
+        class="mb-4"
+        :message="error?.response?.data?.message || error?.message || 'Failed to load charges.'"
+        @dismiss="error = null"
+      />
       <KpiStrip class="grid-cols-2 lg:grid-cols-3">
         <KpiCard label="Pending (company)" :value="companySummary.pending" />
         <KpiCard label="Ready to invoice" :value="companySummary.approved_ready" />
@@ -62,6 +69,9 @@
         empty-description="Approve meter readings to generate utility charges."
         @page-change="fetchList"
       >
+        <template #emptyAction>
+          <ErpButton :to="{ name: 'MeterReadings' }">Open meter readings</ErpButton>
+        </template>
         <template #cell-charge_number="{ row }">
           <code class="text-xs font-mono">{{ row.charge_number }}</code>
         </template>
@@ -127,6 +137,7 @@ import {
   KpiCard,
   KpiStrip,
   ErpModal,
+  AlertBanner,
 } from '@/components/erp'
 
 const route = useRoute()
@@ -139,6 +150,7 @@ const acting = ref(null)
 const {
   items,
   loading,
+  error,
   meta,
   summary,
   companySummary,

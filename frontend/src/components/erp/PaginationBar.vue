@@ -1,15 +1,15 @@
 <template>
   <div
     v-if="meta?.total > 0"
-    class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+    class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-slate-700 dark:bg-slate-800/50"
   >
-    <p class="text-xs text-slate-500 sm:text-sm">
+    <p class="text-xs text-slate-500 sm:text-sm dark:text-slate-400">
       Showing
-      <span class="font-semibold text-slate-800">{{ meta.from || 0 }}</span>
+      <span class="font-semibold text-slate-800 dark:text-slate-200">{{ meta.from || 0 }}</span>
       –
-      <span class="font-semibold text-slate-800">{{ meta.to || 0 }}</span>
+      <span class="font-semibold text-slate-800 dark:text-slate-200">{{ meta.to || 0 }}</span>
       of
-      <span class="font-semibold text-slate-800">{{ meta.total }}</span>
+      <span class="font-semibold text-slate-800 dark:text-slate-200">{{ meta.total }}</span>
     </p>
     <div class="flex items-center justify-end gap-2">
       <ErpButton
@@ -20,7 +20,7 @@
       >
         Previous
       </ErpButton>
-      <span class="px-2 text-xs font-medium text-slate-600">
+      <span class="px-2 text-xs font-medium text-slate-600 dark:text-slate-400">
         Page {{ meta.current_page }} / {{ meta.last_page }}
       </span>
       <ErpButton

@@ -1,10 +1,12 @@
 import { ref, reactive } from 'vue'
 import api from '@/services/api'
+import { unwrapApiList, unwrapApiMeta, unwrapApiRecord } from '@/utils/apiResponse'
 
 export function useCharges() {
   const items = ref([])
   const loading = ref(false)
-  const meta = ref({ current_page: 1, last_page: 1, total: 0 })
+  const error = ref(null)
+  const meta = ref({ current_page: 1, last_page: 1, total: 0, per_page: 20 })
   const summary = reactive({ pending: 0, approved: 0, cancelled: 0 })
   const companySummary = reactive({
     pending: 0,
@@ -23,58 +25,74 @@ export function useCharges() {
   async function fetchCompanySummary() {
     try {
       const { data } = await api.get('/charges/summary')
-      const s = data.data ?? data
+      const s = unwrapApiRecord(data)
       Object.assign(companySummary, {
         pending: s.pending ?? 0,
         approved_ready: s.approved_ready ?? 0,
         invoiced: s.invoiced ?? 0,
         cancelled: s.cancelled ?? 0,
       })
-    } catch {
-      /* keep prior */
+    } catch (e) {
+      console.error('charges/summary failed', e)
     }
   }
 
   async function fetchList(page = 1) {
     loading.value = true
+    error.value = null
     try {
       const { data } = await api.get('/charges', {
         params: {
           page,
-          search: filters.search || undefined,
+          search: filters.search?.trim() || undefined,
           status: filters.status || undefined,
-          category: filters.category || undefined,
+          category: filters.category || 'utility',
           meter_reading_id: filters.meter_reading_id || undefined,
           per_page: 20,
         },
       })
-      items.value = data.data ?? []
-      const m = data.meta ?? {}
+
+      const rows = unwrapApiList(data)
+      items.value = rows
+      const m = unwrapApiMeta(data, {
+        current_page: page,
+        last_page: 1,
+        total: rows.length,
+        per_page: 20,
+      })
       meta.value = {
-        current_page: m.current_page ?? 1,
+        current_page: m.current_page ?? page,
         last_page: m.last_page ?? 1,
-        total: m.total ?? items.value.length,
-        from: m.from ?? 0,
-        to: m.to ?? 0,
+        total: m.total ?? rows.length,
+        from: m.from ?? (rows.length ? 1 : 0),
+        to: m.to ?? rows.length,
         per_page: m.per_page ?? 20,
       }
       refreshSummary()
       await fetchCompanySummary()
+    } catch (e) {
+      error.value = e
+      items.value = []
+      throw e
     } finally {
       loading.value = false
     }
   }
 
   function refreshSummary() {
-    summary.pending = items.value.filter((c) => c.status?.value === 'pending').length
-    summary.approved = items.value.filter((c) => c.status?.value === 'approved').length
-    summary.cancelled = items.value.filter((c) => c.status?.value === 'cancelled').length
+    summary.pending = items.value.filter((c) => chargeStatus(c) === 'pending').length
+    summary.approved = items.value.filter((c) => chargeStatus(c) === 'approved').length
+    summary.cancelled = items.value.filter((c) => chargeStatus(c) === 'cancelled').length
+  }
+
+  function chargeStatus(charge) {
+    return charge?.status?.value ?? charge?.status ?? ''
   }
 
   async function approve(charge) {
     const { data } = await api.post(`/charges/${charge.id}/approve`)
     return {
-      charge: data.data ?? data,
+      charge: unwrapApiRecord(data),
       message: data.message ?? '',
     }
   }
@@ -86,7 +104,7 @@ export function useCharges() {
   async function bulkApprove(chargeIds) {
     const { data } = await api.post('/charges/bulk-approve', { charge_ids: chargeIds })
     return {
-      result: data.data ?? data,
+      result: unwrapApiRecord(data),
       message: data.message ?? '',
     }
   }
@@ -101,6 +119,7 @@ export function useCharges() {
   return {
     items,
     loading,
+    error,
     meta,
     summary,
     companySummary,
@@ -111,5 +130,6 @@ export function useCharges() {
     reject,
     bulkApprove,
     resetFilters,
+    chargeStatus,
   }
 }

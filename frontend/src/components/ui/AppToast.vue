@@ -1,7 +1,7 @@
 <template>
 
   <div
-    class="fixed top-5 right-5 z-[100] space-y-3"
+    class="toast-stack fixed top-5 right-5 z-[100] w-[min(100%,20rem)] space-y-3 sm:w-auto"
   >
 
     <transition-group
@@ -13,7 +13,7 @@
         v-for="toast in toastStore.toasts"
         :key="toast.id"
         :class="toastClass(toast.type)"
-        class="min-w-[320px] rounded-2xl shadow-2xl border p-4 backdrop-blur-xl"
+        class="w-full rounded-2xl border p-4 shadow-2xl backdrop-blur-xl sm:min-w-[18rem]"
       >
 
         <div
@@ -57,20 +57,15 @@ const toastStore =
   useToastStore()
 
 const toastClass = (type) => {
-
   switch (type) {
-
     case 'success':
-      return 'bg-green-50 border-green-200 text-green-800'
-
+      return 'bg-green-50 border-green-200 text-green-800 dark:bg-green-950/50 dark:border-green-800/50 dark:text-green-300'
     case 'error':
-      return 'bg-red-50 border-red-200 text-red-800'
-
+      return 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950/50 dark:border-red-800/50 dark:text-red-300'
     case 'warning':
-      return 'bg-amber-50 border-amber-200 text-amber-800'
-
+      return 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/50 dark:border-amber-800/50 dark:text-amber-300'
     default:
-      return 'bg-white border-slate-200 text-slate-800'
+      return 'bg-white border-slate-200 text-slate-800 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200'
   }
 }
 

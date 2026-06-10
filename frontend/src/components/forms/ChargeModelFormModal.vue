@@ -1,5 +1,6 @@
 <template>
   <FormModal
+    ref="modalRef"
     :open="open"
     :title="isEdit ? 'Edit charge model' : 'Add charge model'"
     subtitle="Pricing strategy and billing behavior."
@@ -16,7 +17,7 @@
         :submitting="submitting"
         :submit-label="isEdit ? 'Save changes' : 'Create charge model'"
         @submit="submit"
-        @cancel="$emit('close')"
+        @cancel="onCancel"
       />
     </template>
   </FormModal>
@@ -36,6 +37,7 @@ import {
 const props = defineProps({ open: Boolean, entityId: { default: null } })
 const emit = defineEmits(['close', 'saved'])
 
+const modalRef = ref(null)
 const loading = ref(false)
 const submitting = ref(false)
 const serverError = ref('')
@@ -43,6 +45,10 @@ const errors = ref({})
 const isEdit = computed(() => !!props.entityId)
 
 const form = reactive(defaultChargeModelForm())
+
+function onCancel() {
+  modalRef.value?.requestClose?.()
+}
 
 async function load() {
   if (!props.entityId) {

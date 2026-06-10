@@ -1,9 +1,9 @@
 <template>
-  <div class="min-h-screen bg-slate-50 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-2xl mx-auto w-full">
+  <div class="flex min-h-[100dvh] flex-col justify-start bg-slate-50 px-4 py-6 sm:justify-center sm:px-6 sm:py-10 lg:px-8 dark:bg-[var(--erp-bg)]">
+    <div class="mx-auto w-full max-w-2xl min-w-0">
 
       <!-- Step Tracker -->
-      <div class="flex items-center justify-center mb-10">
+      <div class="mb-8 flex items-center justify-center overflow-x-auto sm:mb-10">
         <div class="flex flex-col items-center gap-1.5">
           <div class="w-8 h-8 rounded-full bg-blue-100 border border-blue-300 flex items-center justify-center text-blue-700">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -23,10 +23,10 @@
       </div>
 
       <!-- Card -->
-      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
 
         <!-- Card Header -->
-        <div class="px-7 py-5 border-b border-slate-100 flex items-center justify-between gap-4">
+        <div class="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-5 sm:px-7 dark:border-slate-700">
           <div class="flex items-center gap-3.5">
             <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
               <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Z"/></svg>
@@ -45,12 +45,12 @@
         <form @submit.prevent="submitForm">
 
           <!-- Section: Property Overview -->
-          <div class="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-6 px-7 py-6 border-b border-slate-100">
-            <div class="pr-4">
-              <div class="w-7 h-7 rounded-md bg-slate-100 flex items-center justify-center mb-2.5">
-                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205 3 1m1.5.5-1.5-.5M6.75 7.364V3h-3v18m3-13.636 10.5-3.819"/></svg>
+          <div class="grid grid-cols-1 gap-6 border-b border-slate-100 px-4 py-6 md:grid-cols-[200px_1fr] sm:px-7 dark:border-slate-700">
+            <div class="md:pr-4">
+              <div class="mb-2.5 flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800">
+                <svg class="h-3.5 w-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205 3 1m1.5.5-1.5-.5M6.75 7.364V3h-3v18m3-13.636 10.5-3.819"/></svg>
               </div>
-              <p class="text-sm font-medium text-slate-800">Property overview</p>
+              <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Property overview</p>
               <p class="text-xs text-slate-400 mt-1 leading-relaxed">Basic identity and operational status of the building.</p>
             </div>
             <div class="flex flex-col gap-4">
@@ -92,12 +92,12 @@
           </div>
 
           <!-- Section: Scale & Capacity -->
-          <div class="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-6 px-7 py-6 border-b border-slate-100">
-            <div class="pr-4">
-              <div class="w-7 h-7 rounded-md bg-slate-100 flex items-center justify-center mb-2.5">
-                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5"/></svg>
+          <div class="grid grid-cols-1 gap-6 border-b border-slate-100 px-4 py-6 md:grid-cols-[200px_1fr] sm:px-7 dark:border-slate-700">
+            <div class="md:pr-4">
+              <div class="mb-2.5 flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800">
+                <svg class="h-3.5 w-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5"/></svg>
               </div>
-              <p class="text-sm font-medium text-slate-800">Scale &amp; capacity</p>
+              <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Scale &amp; capacity</p>
               <p class="text-xs text-slate-400 mt-1 leading-relaxed">Physical dimensions and unit allocation.</p>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -117,12 +117,12 @@
           </div>
 
           <!-- Section: Location & Financials -->
-          <div class="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-6 px-7 py-6">
-            <div class="pr-4">
-              <div class="w-7 h-7 rounded-md bg-slate-100 flex items-center justify-center mb-2.5">
-                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"/></svg>
+          <div class="grid grid-cols-1 gap-6 px-4 py-6 md:grid-cols-[200px_1fr] sm:px-7">
+            <div class="md:pr-4">
+              <div class="mb-2.5 flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800">
+                <svg class="h-3.5 w-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"/></svg>
               </div>
-              <p class="text-sm font-medium text-slate-800">Location &amp; financials</p>
+              <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Location &amp; financials</p>
               <p class="text-xs text-slate-400 mt-1 leading-relaxed">Where the building is and its billing currency.</p>
             </div>
             <div class="flex flex-col gap-4">
@@ -169,19 +169,19 @@
           </div>
 
           <!-- Footer -->
-          <div class="px-7 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
-            <span class="hidden sm:flex items-center gap-1.5 text-xs text-slate-400">
+          <div class="flex flex-col-reverse items-stretch gap-3 border-t border-slate-100 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7 dark:border-slate-700 dark:bg-slate-800/50">
+            <span class="hidden items-center gap-1.5 text-xs text-slate-400 sm:flex">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/></svg>
               Changes are saved securely
             </span>
-            <div class="flex items-center gap-2 ml-auto">
+            <div class="flex flex-col gap-2 sm:ml-auto sm:flex-row sm:items-center">
               <button type="button" @click="$router.back()"
-                class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors">
+                class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/></svg>
                 Back
               </button>
               <button type="submit" :disabled="loading"
-                class="inline-flex items-center gap-1.5 px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
                 <svg v-if="loading" class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>

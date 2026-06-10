@@ -34,7 +34,7 @@
         </FormField>
       </FormGrid>
     </FormSection>
-    <FormSection compact title="Listing">
+    <FormSection compact :title="pricingSectionTitle">
       <FormGrid>
         <FormField label="Listing type" :error="fieldError('listing_type')">
           <select v-model="form.listing_type" class="erp-select">
@@ -51,11 +51,38 @@
             <option value="maintenance">Maintenance</option>
           </select>
         </FormField>
-        <FormField label="Market rent" :error="fieldError('market_rent_price')">
-          <input v-model.number="form.market_rent_price" type="number" step="0.01" class="erp-input" />
-        </FormField>
         <FormField label="Currency" :error="fieldError('currency')">
           <input v-model="form.currency" type="text" maxlength="3" class="erp-input uppercase" />
+        </FormField>
+        <FormField
+          v-if="showRentPrice"
+          label="Market rent price"
+          required
+          :error="fieldError('market_rent_price')"
+        >
+          <input
+            v-model.number="form.market_rent_price"
+            type="number"
+            step="0.01"
+            min="0.01"
+            class="erp-input"
+            placeholder="Monthly rent"
+          />
+        </FormField>
+        <FormField
+          v-if="showSalePrice"
+          label="Market sale price"
+          required
+          :error="fieldError('market_sale_price')"
+        >
+          <input
+            v-model.number="form.market_sale_price"
+            type="number"
+            step="0.01"
+            min="0.01"
+            class="erp-input"
+            placeholder="Asking sale price"
+          />
         </FormField>
       </FormGrid>
     </FormSection>
@@ -63,7 +90,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { computed, reactive, ref, onMounted, watch } from 'vue'
 import api from '@/services/api'
 import { FormSection, FormGrid, FormField, AlertBanner } from '@/components/erp'
 
@@ -86,10 +113,29 @@ const defaults = () => ({
   listing_type: 'rental',
   inventory_status: 'available',
   market_rent_price: null,
+  market_sale_price: null,
   currency: 'USD',
 })
 
 const form = reactive(defaults())
+
+const showRentPrice = computed(
+  () => form.listing_type === 'rental' || form.listing_type === 'hybrid',
+)
+const showSalePrice = computed(
+  () => form.listing_type === 'sale' || form.listing_type === 'hybrid',
+)
+const pricingSectionTitle = computed(() => {
+  if (form.listing_type === 'sale') return 'Sale listing'
+  if (form.listing_type === 'rental') return 'Rental listing'
+  if (form.listing_type === 'hybrid') return 'Hybrid listing'
+  return 'Listing'
+})
+
+function priceForPayload(value) {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
 
 function fieldError(key) {
   const e = fieldErrors.value[key]
@@ -120,7 +166,8 @@ async function load() {
       area_sqm: a.layout?.area_sqm ?? null,
       listing_type: a.listing?.listing_type ?? 'rental',
       inventory_status: a.listing?.inventory_status ?? 'available',
-      market_rent_price: a.pricing?.market_rent_price ?? a.pricing?.effective_price ?? null,
+      market_rent_price: a.pricing?.market_rent_price ?? null,
+      market_sale_price: a.pricing?.market_sale_price ?? null,
       currency: a.pricing?.currency ?? 'USD',
     })
   } finally {
@@ -128,14 +175,48 @@ async function load() {
   }
 }
 
+function buildPayload() {
+  return {
+    ...form,
+    market_rent_price: showRentPrice.value ? priceForPayload(form.market_rent_price) : null,
+    market_sale_price: showSalePrice.value ? priceForPayload(form.market_sale_price) : null,
+  }
+}
+
+function validatePricing() {
+  const errors = {}
+  if (showRentPrice.value && !priceForPayload(form.market_rent_price)) {
+    errors.market_rent_price = 'Market rent price is required for rental listings.'
+  }
+  if (showSalePrice.value && !priceForPayload(form.market_sale_price)) {
+    errors.market_sale_price = 'Market sale price is required for sale listings.'
+  }
+  fieldErrors.value = errors
+  return Object.keys(errors).length === 0
+}
+
+watch(
+  () => form.listing_type,
+  (type) => {
+    if (type !== 'rental' && type !== 'hybrid') form.market_rent_price = null
+    if (type !== 'sale' && type !== 'hybrid') form.market_sale_price = null
+    fieldErrors.value = {}
+  },
+)
+
 async function submit() {
   fieldErrors.value = {}
   serverError.value = ''
+  if (!validatePricing()) {
+    serverError.value = 'Please enter the required price for the selected listing type.'
+    return
+  }
   try {
+    const payload = buildPayload()
     if (props.entityId) {
-      await api.put(`/apartments/${props.entityId}`, { ...form })
+      await api.put(`/apartments/${props.entityId}`, payload)
     } else {
-      await api.post('/apartments', { ...form })
+      await api.post('/apartments', payload)
     }
     emit('saved')
   } catch (e) {

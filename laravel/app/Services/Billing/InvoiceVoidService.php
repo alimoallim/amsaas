@@ -9,6 +9,7 @@ use App\Models\Charge;
 use App\Models\MonthlyInvoice;
 use App\Models\PaymentAllocation;
 use App\Models\User;
+use App\Services\Collections\DelinquencyTrackingService;
 use App\Services\PaymentService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -52,6 +53,7 @@ class InvoiceVoidService
             ]);
 
             $this->reapplyTenantCredits($invoice->fresh());
+            app(DelinquencyTrackingService::class)->resolveForInvoice($invoice->fresh());
 
             return $invoice->fresh([
                 'lineItems',

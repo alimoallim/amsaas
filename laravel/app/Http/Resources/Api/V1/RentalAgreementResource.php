@@ -392,6 +392,14 @@ class RentalAgreementResource extends JsonResource
                 'grace_period_days' =>
 
                     $this->grace_period_days,
+
+                'deposit_ledger' => $this->when(
+                    $this->includeDetailPayload($request),
+                    fn () => app(\App\Services\RentalDepositService::class)->summary(
+                        (string) $this->agreement?->company_id,
+                        (string) $this->id,
+                    ),
+                ),
             ],
 
             /*

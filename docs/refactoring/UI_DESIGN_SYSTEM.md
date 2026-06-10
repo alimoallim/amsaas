@@ -173,7 +173,7 @@ Use the same pattern on **meter registration** (building + unit pickers).
 | **1** | Worklist indexes: Buildings, Apartments, Tenants, Agreements, Meters, Meter readings, Charge types/models, Dashboard, Reports, Settings | Done |
 | **2** | Object pages (Show): Building (done), Tenant, Apartment, Agreement, Meter, Invoice | In progress |
 | **3** | Create/edit → `TransactionalFormLayout` | Pending |
-| **4** | Meter reading FCL (master-detail approval queue) | Pending |
+| **4** | Meter reading FCL (master-detail approval queue) | Done — `/meter-readings/queue` |
 
 ## CSS
 

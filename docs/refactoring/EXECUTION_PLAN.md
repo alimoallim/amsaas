@@ -187,9 +187,15 @@ Per `project_document.md`: CI operational, isolation verified, no float money ma
 
 ---
 
+## Phase 2 — Invoice engine (after Phase 1)
+
+**Status (2026-06-03):** **CLOSED** — see [PHASE2_PROGRESS.md](./PHASE2_PROGRESS.md). Proceed to Phase 3.
+
+---
+
 ## Phase 1 — Charge engine (only after G1 + G2)
 
-**Status (2026-06-03):** **CLOSED** — see [PHASE1_PROGRESS.md](./PHASE1_PROGRESS.md). Proceed to Phase 2.
+**Status (2026-06-03):** **CLOSED** — see [PHASE1_PROGRESS.md](./PHASE1_PROGRESS.md).
 
 Delivered:
 

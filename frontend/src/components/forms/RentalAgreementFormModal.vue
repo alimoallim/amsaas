@@ -1,5 +1,6 @@
 <template>
   <FormModal
+    ref="modalRef"
     :open="open"
     :title="isEdit ? 'Edit agreement' : 'Create agreement'"
     subtitle="Lease assignment, dates, and financial terms."
@@ -20,7 +21,7 @@
       :initial-building-id="initialBuildingId"
       :initial-status="initialStatus"
       @submit="submit"
-      @cancel="$emit('close')"
+      @cancel="onCancel"
     />
   </FormModal>
 </template>
@@ -28,6 +29,7 @@
 <script setup>
 import { reactive, ref, watch, computed } from 'vue'
 import api from '@/services/api'
+import { useConfirm } from '@/composables/useConfirm'
 import { FormModal } from '@/components/erp'
 import RentalAgreementForm from '@/Pages/rentalAgreements/RentalAgreementForm.vue'
 import { mapBillingFromApi, buildRentalAgreementPayload } from '@/utils/rentalAgreementBilling'
@@ -35,6 +37,7 @@ import { mapBillingFromApi, buildRentalAgreementPayload } from '@/utils/rentalAg
 const props = defineProps({ open: Boolean, entityId: { default: null } })
 const emit = defineEmits(['close', 'saved'])
 
+const modalRef = ref(null)
 const initialLoading = ref(true)
 const loading = ref(false)
 const errors = ref({})
@@ -43,6 +46,7 @@ const tenants = ref([])
 const initialBuildingId = ref('')
 const initialStatus = ref('')
 const isEdit = computed(() => !!props.entityId)
+const { confirm } = useConfirm()
 
 const emptyForm = () => ({
   apartment_id: '',
@@ -58,6 +62,8 @@ const emptyForm = () => ({
   status: 'draft',
   rent_charge_model_id: '',
   recurring_charges: [],
+  notes: '',
+  special_terms: '',
 })
 
 const form = reactive(emptyForm())
@@ -69,6 +75,10 @@ async function loadDependencies() {
   ])
   buildings.value = bRes.data?.data ?? []
   tenants.value = tRes.data?.data ?? []
+}
+
+function onCancel() {
+  modalRef.value?.requestClose?.()
 }
 
 async function load() {
@@ -93,6 +103,8 @@ async function load() {
         security_deposit: item.financials?.security_deposit ?? '',
         auto_renew: item.renewal?.auto_renew ?? false,
         renewal_notice_days: item.renewal?.renewal_notice_days ?? 30,
+        notes: item.notes?.agreement_notes ?? '',
+        special_terms: item.notes?.special_terms ?? '',
         ...mapBillingFromApi(item.billing),
       })
     } else {
@@ -105,15 +117,14 @@ async function load() {
   }
 }
 
-async function submit() {
+async function submit({ confirmCriticalChanges = false } = {}) {
   loading.value = true
   errors.value = {}
   try {
-    const isActive = initialStatus.value === 'active'
     if (props.entityId) {
       await api.put(
         `/rental-agreements/${props.entityId}`,
-        buildRentalAgreementPayload(form, { isActive, forUpdate: true }),
+        buildRentalAgreementPayload(form, { forUpdate: true, confirmCriticalChanges }),
       )
     } else {
       await api.post('/rental-agreements', buildRentalAgreementPayload(form))
@@ -123,6 +134,20 @@ async function submit() {
   } catch (e) {
     if (e.response?.status === 422) {
       errors.value = e.response.data.errors || {}
+
+      if (errors.value.confirm_critical_changes && !confirmCriticalChanges) {
+        const ok = await confirm({
+          title: 'Issued invoices on this agreement',
+          message:
+            'This agreement has issued invoices. Unit, tenant, or start date changes will not alter issued invoices but will update future billing. Continue?',
+          confirmLabel: 'Save changes',
+          variant: 'primary',
+        })
+        if (ok) {
+          loading.value = false
+          return submit({ confirmCriticalChanges: true })
+        }
+      }
     }
   } finally {
     loading.value = false

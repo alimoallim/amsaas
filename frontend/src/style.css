@@ -1,2 +1,50 @@
 @import "tailwindcss";
+
+/* Tailwind `dark:` utilities follow html data-theme / .dark class */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
+
 @import "./styles/erp.css";
+@import "./styles/responsive.css";
+
+:root {
+  color-scheme: light;
+  --erp-bg: #f8fafc;
+  --erp-surface: #ffffff;
+  --erp-surface-muted: #f1f5f9;
+  --erp-border: #e2e8f0;
+  --erp-border-soft: #f1f5f9;
+  --erp-text: #0f172a;
+  --erp-text-muted: #64748b;
+  --erp-text-subtle: #94a3b8;
+  --erp-accent: #4f46e5;
+  --erp-accent-soft: #eef2ff;
+  --erp-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --erp-bg: #0b0f14;
+  --erp-surface: #161b22;
+  --erp-surface-muted: #1c2128;
+  --erp-border: #30363d;
+  --erp-border-soft: #21262d;
+  --erp-text: #e6edf3;
+  --erp-text-muted: #8b949e;
+  --erp-text-subtle: #6e7681;
+  --erp-accent: #58a6ff;
+  --erp-accent-soft: #121d2f;
+  --erp-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--erp-bg);
+  color: var(--erp-text);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}

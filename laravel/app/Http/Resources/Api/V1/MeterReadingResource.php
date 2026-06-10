@@ -317,6 +317,10 @@ class MeterReadingResource extends JsonResource
 
                     $this->canBeApproved(),
 
+                'can_edit' =>
+
+                    $this->canBeEdited(),
+
                 'can_reject' =>
 
                     !$this->isRejected(),

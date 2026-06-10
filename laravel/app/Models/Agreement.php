@@ -50,6 +50,8 @@ class Agreement extends Model
 
         'tenant_id',
 
+        'buyer_id',
+
         'status',
 
         'start_date',
@@ -216,6 +218,11 @@ class Agreement extends Model
         return $this->belongsTo(
             Tenant::class
         );
+    }
+
+    public function buyer(): BelongsTo
+    {
+        return $this->belongsTo(Buyer::class);
     }
 
     /*

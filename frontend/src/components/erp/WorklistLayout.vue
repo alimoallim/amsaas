@@ -18,7 +18,7 @@
 
     <div
       v-if="selectionToolbar && hasSelection"
-      class="flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50/80 px-4 py-2 text-sm text-indigo-900"
+      class="flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50/80 px-4 py-2 text-sm text-indigo-900 dark:border-indigo-800/50 dark:bg-indigo-950/40 dark:text-indigo-200"
     >
       <span class="font-medium">{{ selectionLabel }}</span>
       <slot name="selection-actions" />

@@ -1,5 +1,5 @@
 <template>
-  <div class="shell" :data-theme="theme" :class="{ 'shell--sidebar-open': mobileOpen }">
+  <div class="shell" :data-theme="themeStore.resolved" :class="{ 'shell--sidebar-open': mobileOpen }">
 
     <!-- Skip link -->
     <a href="#main" class="skip-link">Skip to content</a>
@@ -67,109 +67,7 @@
         </button>
       </div>
 
-      <!-- Nav -->
-     <nav class="sidebar-nav" aria-label="Primary">
-
-  <div
-    v-for="group in navGroups"
-    :key="group.label"
-    class="nav-group"
-  >
-
-    <Transition name="label-fade">
-
-      <p
-        v-if="!collapsed"
-        class="nav-group-label"
-      >
-        {{ group.label }}
-      </p>
-
-      <div
-        v-else
-        class="nav-group-divider"
-        role="separator"
-      />
-
-    </Transition>
-
-    <template v-for="item in group.items" :key="item.to">
-    <span
-      v-if="item.disabled"
-      class="nav-item nav-item--disabled"
-      :title="collapsed ? item.label : (item.disabledHint || item.label)"
-      role="presentation"
-    >
-      <span class="nav-item-icon" v-html="item.icon" />
-      <Transition name="label-fade">
-        <span v-if="!collapsed" class="nav-item-label">{{ item.label }}</span>
-      </Transition>
-      <Transition name="label-fade">
-        <span v-if="!collapsed && item.badge" class="nav-badge nav-badge--muted">{{ item.badge }}</span>
-      </Transition>
-    </span>
-
-    <RouterLink
-      v-else
-      :to="item.to"
-      class="nav-item"
-      :class="{
-        'nav-item--active':
-          isActive(item.to)
-      }"
-      @click="closeMobile"
-      :title="
-        collapsed
-          ? item.label
-          : undefined
-      "
-    >
-
-      <span
-        class="nav-item-icon"
-        v-html="item.icon"
-      />
-
-      <Transition name="label-fade">
-
-        <span
-          v-if="!collapsed"
-          class="nav-item-label"
-        >
-          {{ item.label }}
-        </span>
-
-      </Transition>
-
-      <Transition name="label-fade">
-
-        <span
-          v-if="
-            !collapsed
-            && item.badge
-          "
-          class="nav-badge"
-        >
-          {{ item.badge }}
-        </span>
-
-      </Transition>
-
-      <!-- Tooltip -->
-
-      <span
-        v-if="collapsed"
-        class="nav-tooltip"
-      >
-        {{ item.label }}
-      </span>
-
-    </RouterLink>
-    </template>
-
-  </div>
-
-</nav>
+      <SidebarNav :collapsed="collapsed" @navigate="closeMobile" />
 
       <!-- Footer / user -->
       <div class="sidebar-footer" ref="userMenuRef">
@@ -265,15 +163,7 @@
             <span>{{ period }}</span>
           </div>
 
-          <!-- Theme toggle -->
-          <button class="icon-btn" @click="toggleTheme" :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'" :title="theme === 'dark' ? 'Light mode' : 'Dark mode'">
-            <svg v-if="theme === 'dark'" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-            </svg>
-            <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-            </svg>
-          </button>
+          <ThemeToggle compact class="topbar-theme-toggle" />
 
           <!-- Notifications -->
           <button class="icon-btn icon-btn--notif" @click="notifOpen = !notifOpen" :aria-label="`Notifications${unread > 0 ? `, ${unread} unread` : ''}`">
@@ -368,6 +258,9 @@ import {
   useRouter
 } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
+import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import SidebarNav from '@/components/layout/SidebarNav.vue'
 
 /* ─── Props ─────────────────────────────────────────────────── */
 const props = defineProps({
@@ -382,11 +275,11 @@ const emit = defineEmits(['logout', 'mark-read'])
 const route  = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const themeStore = useThemeStore()
 
 /* ─── State ──────────────────────────────────────────────────── */
 const collapsed     = ref(false)
 const mobileOpen    = ref(false)
-const theme         = ref('light')
 const userMenuOpen  = ref(false)
 const topbarMenuOpen = ref(false)
 const notifOpen     = ref(false)
@@ -394,123 +287,6 @@ const cmdOpen       = ref(false)
 
 const userMenuRef    = ref(null)
 const topbarUserRef  = ref(null)
-
-/* ─── Navigation map ─────────────────────────────────────────── */
-const navGroups = [
-  {
-    label: 'Operations',
-    items: [
-      {
-        to: '/dashboard',
-        label: 'Dashboard',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`
-      },
-      {
-        to: '/buildings',
-        label: 'Buildings',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`
-      },
-      {
-        to: '/apartments',
-        label: 'Apartments',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`
-      },
-      {
-        to: '/tenants',
-        label: 'Tenants',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
-      },
-
-       {
-        to: '/rental-agreements',
-        label: 'Rental Agreements',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
-      },
-      {
-        to: '/meters',
-        label: 'Meter Management',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
-      },
-      {
-        to: '/meter-readings',
-        label: 'Meter Reading',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
-      },
-      
-    ]
-  },
-  {
-    label: 'Finance',
-    items: [
-      {
-        to: '/charge-types',
-        label: 'Charge Types',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h7"/></svg>`
-      },
-      {
-        to: '/charge-models',
-        label: 'Charge Models',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`
-      },
-      {
-        to: '/charges/approve',
-        label: 'Approve charges',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`
-      },
-      {
-        to: '/charges',
-        label: 'All utility charges',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>`
-      },
-      {
-        to: '/invoices',
-        label: 'Billing close',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>`
-      },
-      {
-        to: '/invoices/monthly',
-        label: 'Monthly invoices',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`
-      },
-      {
-        to: '/payments',
-        label: 'Payments',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`
-      },
-      {
-        to: '/reports',
-        label: 'Reports',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`
-      },
-    ]
-  },
-  {
-    label: 'System',
-    items: [
-      {
-        to: '/settings',
-        label: 'Settings',
-        badge: null,
-        icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
-      },
-    ]
-  }
-]
 
 /* ─── Computed ───────────────────────────────────────────────── */
 const userInitials = computed(() => {
@@ -524,10 +300,18 @@ const routeTitles = {
   'invoices/monthly': 'Monthly invoices',
   invoicecreate: 'Create invoice',
   invoiceshow: 'Invoice detail',
+  accounts: 'Chart of Accounts',
+  'general-ledger': 'General Ledger', generalledger: 'General Ledger',
+  'trial-balance': 'Trial Balance', trialbalance: 'Trial Balance',
+  'income-statement': 'Income Statement', incomestatement: 'Income Statement',
+  'balance-sheet': 'Balance Sheet', balancesheet: 'Balance Sheet',
+  'financial-audit': 'Financial Audit', financialaudit: 'Financial Audit',
   chargemodels: 'Charge Models', 'charge-models': 'Charge Models',
   charges: 'Utility Charges',
   'charge-types': 'Charge Types', chargetypes: 'Charge Types',
-  reports: 'Reports', settings: 'Settings'
+  reports: 'Reports', settings: 'Settings',
+  sales: 'Sales', 'sales/inventory': 'Property inventory', 'sales/reservations': 'Reservations',
+  'sales/contracts': 'Sale contracts', 'sales/buyers': 'Buyers',
 }
 
 const pageTitle = computed(() => {
@@ -553,8 +337,6 @@ const periodEnding = computed(() => {
 })
 
 /* ─── Methods ────────────────────────────────────────────────── */
-const isActive = (path) => path === '/dashboard' ? route.path === '/dashboard' : route.path.startsWith(path)
-
 const toggleCollapse = () => {
   collapsed.value = !collapsed.value
   localStorage.setItem('sb-collapsed', collapsed.value)
@@ -562,12 +344,6 @@ const toggleCollapse = () => {
 
 const openMobile  = () => { mobileOpen.value = true;  document.body.style.overflow = 'hidden' }
 const closeMobile = () => { mobileOpen.value = false; document.body.style.overflow = '' }
-
-const toggleTheme = () => {
-  theme.value = theme.value === 'light' ? 'dark' : 'light'
-  localStorage.setItem('theme', theme.value)
-  document.documentElement.setAttribute('data-theme', theme.value)
-}
 
 const goSettings = () => { router.push('/settings'); userMenuOpen.value = false; topbarMenuOpen.value = false }
 const doLogout = async () => {
@@ -596,12 +372,6 @@ const handleKey = (e) => {
 onMounted(() => {
   const sc = localStorage.getItem('sb-collapsed')
   if (sc !== null) collapsed.value = sc === 'true'
-
-  const th = localStorage.getItem('theme')
-  if (th) { theme.value = th; document.documentElement.setAttribute('data-theme', th) }
-  else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    theme.value = 'dark'; document.documentElement.setAttribute('data-theme', 'dark')
-  }
 
   window.addEventListener('keydown', handleKey)
   document.addEventListener('click', handleClickOutside)
@@ -710,6 +480,18 @@ watch(() => route.path, () => {
   transition: top .15s var(--ease);
 }
 .skip-link:focus { top: 16px; outline: 2px solid #fff; outline-offset: 2px; }
+
+.topbar-theme-toggle {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0.45rem;
+}
+
+.topbar-theme-toggle:hover {
+  background: var(--border-soft);
+  color: var(--text);
+}
 
 /* ═══════════════════════════════════════════════════════════
    Mobile backdrop
@@ -838,107 +620,6 @@ watch(() => route.path, () => {
   }
   .mobile-close-btn:hover { background: rgba(255,255,255,.12); }
 }
-
-/* ─ Nav ───────────────────────────────────────────────────── */
-.sidebar-nav {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 16px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,.07) transparent;
-}
-.sidebar-nav::-webkit-scrollbar { width: 4px; }
-.sidebar-nav::-webkit-scrollbar-track { background: transparent; }
-.sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 4px; }
-
-.nav-group { display: flex; flex-direction: column; gap: 2px; }
-
-.nav-group-label {
-  font-size: 10px; font-weight: 700;
-  letter-spacing: .08em; text-transform: uppercase;
-  color: var(--sb-grp);
-  padding: 0 10px; margin-bottom: 6px;
-  white-space: nowrap;
-}
-.nav-group-divider {
-  height: 1px;
-  background: var(--sb-border);
-  margin: 0 4px 8px;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--r-md);
-  color: var(--sb-text);
-  text-decoration: none;
-  font-size: 13.5px;
-  font-weight: 500;
-  position: relative;
-  white-space: nowrap;
-  transition: background .12s, color .12s;
-}
-.nav-item:hover { background: rgba(255,255,255,.05); color: var(--sb-text-hov); }
-
-.nav-item--disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-.nav-badge--muted {
-  background: #f1f5f9;
-  color: #64748b;
-}
-.nav-item--active {
-  background: var(--sb-active-bg) !important;
-  color: var(--sb-active-tx) !important;
-}
-.nav-item--active::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 20%; bottom: 20%;
-  width: 2.5px;
-  border-radius: 0 2px 2px 0;
-  background: var(--sb-active-bar);
-  margin-left: -10px;
-}
-
-.nav-item-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 16px; }
-.nav-item-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-
-.nav-badge {
-  font-size: 10px; font-weight: 700;
-  background: rgba(88,166,255,.18); color: var(--sb-active-tx);
-  border-radius: 99px;
-  padding: 1px 7px;
-  line-height: 1.5;
-}
-
-/* Tooltip for rail mode */
-.nav-tooltip {
-  position: absolute;
-  left: calc(var(--sb-rail) - 2px);
-  top: 50%; transform: translateY(-50%);
-  background: var(--sb-label-bg);
-  color: var(--sb-text-hov);
-  font-size: 12px; font-weight: 600;
-  padding: 5px 12px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--sb-border);
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity .12s;
-  z-index: 100;
-  box-shadow: var(--sh-md);
-}
-.sidebar--rail .nav-item:hover .nav-tooltip { opacity: 1; }
 
 /* ─ Footer ────────────────────────────────────────────────── */
 .sidebar-footer {
@@ -1210,7 +891,16 @@ watch(() => route.path, () => {
   min-width: 0;
   outline: none;
 }
-@media (max-width: 767px) { .page-content { padding: 16px; } }
+@media (max-width: 767px) {
+  .page-content { padding: 16px; }
+  .topbar { padding: 0 12px; gap: 8px; }
+  .page-heading { font-size: 15px; }
+}
+
+@media (max-width: 480px) {
+  .breadcrumb { display: none; }
+  .topbar-user { padding-right: 6px; }
+}
 
 /* Toast stack */
 .toast-stack {

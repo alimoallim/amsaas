@@ -50,6 +50,9 @@
         </FormField>
         <FormField label="Frequency" :error="fieldError('billing_frequency')">
           <select v-model="form.billing_frequency" class="erp-select">
+            <option value="one_time">One-time payment</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
             <option value="quarterly">Quarterly</option>
             <option value="yearly">Yearly</option>
@@ -64,7 +67,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onMounted, watch } from 'vue'
 import api from '@/services/api'
 import { FormSection, FormGrid, FormField, AlertBanner } from '@/components/erp'
 
@@ -102,6 +105,13 @@ const defaults = () => ({
 })
 
 const form = reactive(defaults())
+
+watch(
+  () => form.billing_frequency,
+  (frequency) => {
+    form.is_recurring = frequency !== 'one_time'
+  },
+)
 
 function fieldError(key) {
   const e = fieldErrors.value[key]

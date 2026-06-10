@@ -2,7 +2,7 @@
   <div ref="rootRef" class="relative inline-flex justify-end" @click.stop>
     <button
       type="button"
-      class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
+      class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100"
       :aria-expanded="open"
       aria-haspopup="menu"
       aria-label="Row actions"
@@ -19,7 +19,7 @@
       <div
         v-if="open && visibleActions.length"
         ref="menuRef"
-        class="erp-row-actions-menu z-[230] min-w-[10rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+        class="erp-row-actions-menu z-[230] min-w-[10rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-600 dark:bg-slate-900"
         :style="menuStyle"
         role="menu"
       >
@@ -27,7 +27,7 @@
           <RouterLink
             v-if="item.to"
             :to="item.to"
-            class="erp-row-actions-menu__item block w-full text-left"
+            class="erp-row-actions-menu__item block w-full text-left text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
             :class="itemClass(item)"
             role="menuitem"
             @click="close"
@@ -37,7 +37,7 @@
           <button
             v-else
             type="button"
-            class="erp-row-actions-menu__item w-full text-left"
+            class="erp-row-actions-menu__item w-full text-left text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
             :class="itemClass(item)"
             :disabled="item.disabled"
             role="menuitem"
@@ -74,10 +74,10 @@ const visibleActions = computed(() =>
 
 function itemClass(item) {
   return {
-    'text-red-600 hover:bg-red-50': item.variant === 'danger',
-    'text-indigo-700 hover:bg-indigo-50': item.variant === 'primary',
-    'text-emerald-700 hover:bg-emerald-50': item.variant === 'success',
-    'text-amber-700 hover:bg-amber-50': item.variant === 'warning',
+    'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40': item.variant === 'danger',
+    'text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40': item.variant === 'primary',
+    'text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40': item.variant === 'success',
+    'text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40': item.variant === 'warning',
     'opacity-40 cursor-not-allowed': item.disabled,
   }
 }
@@ -133,10 +133,6 @@ watch(open, (isOpen) => {
   padding: 0.5rem 0.75rem;
   font-size: 0.8125rem;
   font-weight: 500;
-  color: rgb(51 65 85);
   transition: background-color 0.15s;
-}
-.erp-row-actions-menu__item:hover:not(:disabled) {
-  background-color: rgb(248 250 252);
 }
 </style>

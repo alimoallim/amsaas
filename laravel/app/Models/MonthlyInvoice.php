@@ -9,11 +9,16 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use App\Models\Traits\BelongsToCompany; 
+use App\Models\Traits\BelongsToCompany;
+use App\Traits\LogsActivity;
 
 class MonthlyInvoice extends Model
 {
-    use HasFactory, HasUuids, SoftDeletes,BelongsToCompany;
+    use BelongsToCompany;
+    use HasFactory;
+    use HasUuids;
+    use LogsActivity;
+    use SoftDeletes;
 
     protected $guarded = ['id'];
 

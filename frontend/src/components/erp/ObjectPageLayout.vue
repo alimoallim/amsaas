@@ -17,7 +17,7 @@
 
       <nav
         v-if="tabs?.length"
-        class="erp-tabs -mx-1 mt-2 flex gap-1 overflow-x-auto border-b border-slate-200"
+        class="erp-tabs -mx-1 mt-2 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700"
         aria-label="Object sections"
       >
         <button
@@ -27,8 +27,8 @@
           class="erp-tab whitespace-nowrap px-4 py-2.5 text-sm font-medium transition"
           :class="
             activeTab === tab.id
-              ? 'border-b-2 border-indigo-600 text-indigo-700'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'border-b-2 border-indigo-600 text-indigo-700 dark:border-indigo-400 dark:text-indigo-300'
+              : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
           "
           :aria-selected="activeTab === tab.id"
           role="tab"

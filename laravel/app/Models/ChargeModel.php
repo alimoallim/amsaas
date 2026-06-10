@@ -423,17 +423,24 @@ class ChargeModel extends Model
 
     public function isCurrentlyEffective(): bool
     {
-        $today = now()->toDateString();
+        $today = now()->startOfDay();
 
-        return (
+        $from = $this->effective_from
+            ? \Illuminate\Support\Carbon::parse($this->effective_from)->startOfDay()
+            : null;
 
-            $this->effective_from <= $today
-            &&
-            (
-                !$this->effective_to
-                ||
-                $this->effective_to >= $today
-            )
-        );
+        $to = $this->effective_to
+            ? \Illuminate\Support\Carbon::parse($this->effective_to)->startOfDay()
+            : null;
+
+        if ($from && $from->gt($today)) {
+            return false;
+        }
+
+        if ($to && $to->lt($today)) {
+            return false;
+        }
+
+        return true;
     }
 }

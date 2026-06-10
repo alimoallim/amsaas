@@ -103,7 +103,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useTenants } from '@/composables/useTenants'
 import { useSmartFilters } from '@/composables/useSmartFilters'
 import { useFormModal } from '@/composables/useFormModal'
-import { compactActions, editAction } from '@/composables/useTableActions'
+import { compactActions, editAction, viewAction } from '@/composables/useTableActions'
 import TenantFormModal from '@/components/forms/TenantFormModal.vue'
 import { tenantDisplayName } from '@/utils/tenantDisplayName'
 import {
@@ -147,7 +147,10 @@ const columns = [
 ]
 
 function tenantActions(row) {
-  return compactActions([editAction(() => formModal.openEdit(row.id), 'Edit')])
+  return compactActions([
+    viewAction('TenantBilling', row.id, 'Billing'),
+    editAction(() => formModal.openEdit(row.id), 'Edit'),
+  ])
 }
 
 function tenantEmail(row) {

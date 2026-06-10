@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Models\SaleOwnershipApproval;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -105,6 +106,18 @@ class SaleAgreementResource extends JsonResource
                                 ?->apartment
                                 ?->building_id,
 
+                        'building' =>
+
+                            $this->agreement
+                                ?->apartment
+                                ?->relationLoaded('building')
+                            && $this->agreement?->apartment?->building
+                                ? [
+                                    'id' => $this->agreement->apartment->building->id,
+                                    'name' => $this->agreement->apartment->building->name,
+                                ]
+                                : null,
+
                         'listing_type' =>
 
                             $this->agreement
@@ -143,43 +156,43 @@ class SaleAgreementResource extends JsonResource
             |--------------------------------------------------------------------------
             */
 
-            'customer' =>
+            'buyer' =>
 
                 $this->when(
 
                     $this->agreement
-                    ?->tenant,
+                    ?->buyer,
 
                     fn () => [
 
                         'id' =>
 
                             $this->agreement
-                                ?->tenant
+                                ?->buyer
                                 ?->id,
 
-                        'customer_code' =>
+                        'buyer_code' =>
 
                             $this->agreement
-                                ?->tenant
-                                ?->tenant_code,
+                                ?->buyer
+                                ?->buyer_code,
 
-                        'display_name' =>
+                        'full_name' =>
 
                             $this->agreement
-                                ?->tenant
-                                ?->full_display_name,
+                                ?->buyer
+                                ?->full_name,
 
                         'email' =>
 
                             $this->agreement
-                                ?->tenant
+                                ?->buyer
                                 ?->email,
 
                         'phone' =>
 
                             $this->agreement
-                                ?->tenant
+                                ?->buyer
                                 ?->phone,
                     ]
                 ),
@@ -261,9 +274,27 @@ class SaleAgreementResource extends JsonResource
 
                     $this->down_payment,
 
+                'financed_amount' =>
+
+                    $this->isPaymentPlan()
+                        ? $this->financedAmountValue()
+                        : null,
+
+                'paid_amount' =>
+
+                    $this->paidAmount(),
+
+                'balance_due' =>
+
+                    $this->balanceDue(),
+
                 'remaining_balance' =>
 
-                    $this->remaining_balance,
+                    $this->balanceDue(),
+
+                'progress_percent' =>
+
+                    $this->progressPercent(),
 
                 'contract_amount' =>
 
@@ -278,13 +309,40 @@ class SaleAgreementResource extends JsonResource
                 'broker_commission' =>
 
                     $this->broker_commission,
+
+                'price_locked' =>
+
+                    $this->isPriceLocked(),
+
+                'deposit_applied' =>
+
+                    $this->depositAppliedAmount(),
+
+                'deposit_ledger' =>
+
+                    app(\App\Services\Sales\SaleDepositService::class)->summary(
+                        (string) $this->agreement?->company_id,
+                        (string) $this->id,
+                    ),
             ],
 
             /*
             |--------------------------------------------------------------------------
-            | Installment Plan
+            | Payment Plan (agreement-based financed sale)
             |--------------------------------------------------------------------------
             */
+
+            'payment_plan' =>
+
+                $this->isPaymentPlan()
+                    ? array_merge($this->paymentPlanSummary(), [
+                        'mode' => 'payment_plan',
+                        'start_date' => optional($this->agreement?->start_date)->format('Y-m-d'),
+                        'end_date' => optional($this->agreement?->end_date)->format('Y-m-d'),
+                    ])
+                    : [
+                        'mode' => 'cash',
+                    ],
 
             'installments' => [
 
@@ -292,13 +350,31 @@ class SaleAgreementResource extends JsonResource
 
                     (bool) $this->is_installment_sale,
 
+                'is_payment_plan' =>
+
+                    $this->isPaymentPlan(),
+
                 'installment_months' =>
 
                     $this->installment_months,
 
+                'plan_duration_years' =>
+
+                    $this->plan_duration_years,
+
+                'plan_duration_months' =>
+
+                    $this->plan_duration_months,
+
                 'monthly_installment_amount' =>
 
                     $this->monthly_installment_amount,
+
+                'summary' =>
+
+                    $this->isPaymentPlan()
+                        ? $this->paymentPlanSummary()
+                        : null,
             ],
 
             /*
@@ -316,6 +392,23 @@ class SaleAgreementResource extends JsonResource
                 'title_deed_issued' =>
 
                     (bool) $this->title_deed_issued,
+
+                'title_deed_number' =>
+
+                    $this->title_deed_number,
+
+                'pending_steps' =>
+
+                    $this->ownershipPendingSteps(),
+
+                'approvals' =>
+
+                    $this->when(
+                        $this->relationLoaded('ownershipApprovals'),
+                        fn () => SaleOwnershipApprovalResource::collection(
+                            $this->ownershipApprovals,
+                        ),
+                    ),
             ],
 
             /*
@@ -347,7 +440,38 @@ class SaleAgreementResource extends JsonResource
 
                     $this->agreement
                         ?->contract_file_path,
+
+                'completion_certificate_path' =>
+
+                    $this->completion_certificate_path,
+
+                'ownership_transfer_certificate_path' =>
+
+                    $this->ownership_transfer_certificate_path,
+
+                'has_completion_certificate' =>
+
+                    ! empty($this->completion_certificate_path),
+
+                'has_ownership_transfer_certificate' =>
+
+                    ! empty($this->ownership_transfer_certificate_path),
             ],
+
+            'payments' =>
+
+                $this->when(
+                    $this->relationLoaded('paymentAllocations'),
+                    fn () => $this->paymentAllocations
+                        ->map(fn ($allocation) => [
+                            'id' => $allocation->payment_id,
+                            'receipt_number' => $allocation->payment?->receipt_number,
+                            'amount' => $allocation->amount_allocated,
+                            'payment_date' => optional($allocation->payment?->payment_date)->format('Y-m-d'),
+                            'payment_method' => $allocation->payment?->payment_method,
+                        ])
+                        ->values(),
+                ),
 
             /*
             |--------------------------------------------------------------------------
@@ -405,6 +529,81 @@ class SaleAgreementResource extends JsonResource
                         $this->updated_at
 
                     )->toDateTimeString(),
+            ],
+
+            'controls' => [
+
+                'can_edit' =>
+
+                    (bool) $this->agreement
+                        ?->canBeEdited(),
+
+                'can_execute' =>
+
+                    $this->agreement
+                        ?->status === 'draft',
+
+                'can_cancel' =>
+
+                    $this->agreement
+                        ?->status === 'draft',
+
+                'can_delete' =>
+
+                    $this->agreement
+                        ?->status === 'draft',
+
+                'can_record_payment' =>
+
+                    $this->agreement?->status === 'active'
+                    && $this->balanceDue() > 0.009,
+
+                'can_download_completion_certificate' =>
+
+                    $this->agreement?->status === 'completed'
+                    && ! empty($this->completion_certificate_path),
+
+                'can_approve_ownership' =>
+
+                    $this->agreement?->status === 'completed'
+                    && ! $this->ownership_transferred
+                    && count($this->ownershipPendingSteps()) > 0,
+
+                'can_approve_legal' =>
+
+                    $this->canApproveOwnershipStep(SaleOwnershipApproval::STEP_LEGAL),
+
+                'can_approve_finance' =>
+
+                    $this->canApproveOwnershipStep(SaleOwnershipApproval::STEP_FINANCE),
+
+                'can_approve_manager' =>
+
+                    $this->canApproveOwnershipStep(SaleOwnershipApproval::STEP_MANAGER),
+
+                'can_issue_title_deed' =>
+
+                    $this->agreement?->status === 'completed'
+                    && $this->ownership_transferred
+                    && ! $this->title_deed_issued,
+
+                'can_download_ownership_transfer_certificate' =>
+
+                    $this->agreement?->status === 'completed'
+                    && $this->ownership_transferred
+                    && ! empty($this->ownership_transfer_certificate_path),
+
+                'can_download_sales_contract' =>
+
+                    in_array($this->agreement?->status, ['active', 'completed'], true),
+
+                'can_download_payment_plan_statement' =>
+
+                    $this->isPaymentPlan(),
+
+                'can_download_installment_schedule' =>
+
+                    $this->isPaymentPlan(),
             ],
         ];
     }

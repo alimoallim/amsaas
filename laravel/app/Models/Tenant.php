@@ -75,6 +75,8 @@ class Tenant extends Model
 
         'status',
 
+        'reminder_opt_out',
+
         'notes',
 
         'created_by',

@@ -1,0 +1,77 @@
+/* Mobile-first responsive foundations */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html,
+body {
+  overflow-x: clip;
+}
+
+/* iOS: 16px inputs avoid focus zoom */
+@layer components {
+  @media (max-width: 639px) {
+    .erp-input,
+    .erp-select,
+    .erp-date-input__trigger {
+      font-size: 1rem;
+      line-height: 1.5rem;
+      min-height: 2.75rem;
+    }
+
+    .erp-page {
+      @apply space-y-4;
+    }
+  }
+}
+
+/* Safe areas for notched devices */
+@supports (padding: max(0px)) {
+  .auth-shell-main,
+  .page-content {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  .auth-shell-main {
+    padding-bottom: max(2.5rem, env(safe-area-inset-bottom));
+  }
+
+  .toast-stack {
+    right: max(1.25rem, env(safe-area-inset-right));
+    bottom: max(1.25rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* Wide ERP tables — smooth horizontal scroll on touch devices */
+@layer components {
+  .erp-table-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .erp-table-scroll::after {
+    content: '';
+    position: sticky;
+    right: 0;
+    top: 0;
+    display: block;
+    width: 1.5rem;
+    height: 100%;
+    margin-left: -1.5rem;
+    pointer-events: none;
+    background: linear-gradient(to left, rgba(248, 250, 252, 0.95), transparent);
+  }
+
+  html[data-theme='dark'] .erp-table-scroll::after {
+    background: linear-gradient(to left, rgba(15, 23, 42, 0.95), transparent);
+  }
+
+  @media (min-width: 1024px) {
+    .erp-table-scroll::after {
+      display: none;
+    }
+  }
+}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Exceptions\BusinessRuleException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\ApplyRentalDepositRequest;
 use App\Http\Requests\Api\V1\StoreRentalAgreementRequest;
 use App\Http\Requests\Api\V1\UpdateRentalAgreementRequest;
 use App\Http\Resources\Api\V1\MonthlyInvoiceResource;
@@ -12,6 +13,7 @@ use App\Models\RentalAgreement;
 use App\Services\Billing\ConsolidationResult;
 use App\Services\Billing\InvoiceConsolidationService;
 use App\Services\Property\RentalAgreementService;
+use App\Services\RentalDepositService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -117,6 +119,50 @@ class RentalAgreementController extends Controller
             'success' => true,
             'data' => new RentalAgreementResource($rentalAgreement),
         ]);
+    }
+
+    public function applyDeposit(
+        ApplyRentalDepositRequest $request,
+        string $id,
+        RentalDepositService $deposits,
+    ): JsonResponse {
+        $rentalAgreement = RentalAgreement::query()
+            ->whereHas(
+                'agreement',
+                fn ($query) => $query
+                    ->where('company_id', $request->user()->company_id)
+                    ->where('id', $id)
+            )
+            ->first();
+
+        if (! $rentalAgreement) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Rental agreement not found.',
+            ], 404);
+        }
+
+        $application = $deposits->applyToInvoice(
+            $request->user(),
+            $id,
+            $request->validated(),
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => sprintf(
+                'Applied $%s of security deposit to invoice %s.',
+                number_format((float) $application->amount, 2),
+                $application->monthlyInvoice?->invoice_number ?? '',
+            ),
+            'data' => [
+                'id' => $application->id,
+                'amount' => (float) $application->amount,
+                'monthly_invoice_id' => $application->monthly_invoice_id,
+                'invoice_number' => $application->monthlyInvoice?->invoice_number,
+                'deposit_ledger' => $deposits->summary($request->user()->company_id, $id),
+            ],
+        ], 201);
     }
 
     public function destroy(Request $request, string $id): JsonResponse

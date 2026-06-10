@@ -4,154 +4,115 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\RentalAgreement;
-use App\Services\Billing\InvoiceConsolidationService;
+use App\Models\Company;
+use App\Models\User;
+use App\Services\Billing\BillingPipelineService;
 use App\Support\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\Console\Command\Command as SymfonyCommand;
-use Throwable;
 
 class GenerateMonthlyInvoices extends Command
 {
-    /**
-     * The name and signature of the console command.
-     * Enforces explicit tenant isolation boundaries alongside temporal overrides.
-     *
-     * @var string
-     */
     protected $signature = 'billing:generate-monthly
-                            {--company_id= : The explicit ID of the tenant company to isolate execution}
-                            {--year= : Optional target processing year override (Format: YYYY)}
-                            {--month= : Optional target processing month override (Format: MM)}';
+                            {--company_id= : Tenant company UUID (required)}
+                            {--year= : Target year (YYYY)}
+                            {--month= : Target month (1-12)}
+                            {--skip-recurring : Only consolidate; do not run recurring rent/fees}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Consolidates all pending unposted billing items and dynamic utility charges into finalized invoices per active contract.';
+    protected $description = 'Run monthly billing close: recurring charges + invoice consolidation per active agreement.';
 
-    /**
-     * Execute the console command.
-     */
-    public function handle(InvoiceConsolidationService $consolidationService): int
+    public function handle(): int
     {
         $companyId = $this->option('company_id');
 
-        // 1. Strict Multi-Tenant Pre-flight Verification Guardrail
-        if (!$companyId || !is_numeric($companyId)) {
-            $this->error('Aborted: Multi-tenancy safeguard triggered. You must provide a valid numeric --company_id.');
+        if (! $companyId) {
+            $this->error('Aborted: --company_id is required for multi-tenant isolation.');
+
             return SymfonyCommand::FAILURE;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Establish Safe CLI Tenant Execution Context
-        |--------------------------------------------------------------------------
-        | Binds the targeted company ID into the service container. This explicitly
-        | activates your CompanyScope and BelongsToCompany traits for all database
-        | connections instantiated during this execution lifecycle.
-        |--------------------------------------------------------------------------
-        */
-        TenantContext::setCompanyId((string) $companyId);
+        $company = Company::query()->find($companyId);
 
-        // 2. Parse and Validate Date Parameters
+        if (! $company) {
+            $this->error("Company not found: {$companyId}");
+
+            return SymfonyCommand::FAILURE;
+        }
+
+        TenantContext::setCompanyId((string) $company->id);
+
+        $user = User::query()
+            ->where('company_id', $company->id)
+            ->orderBy('created_at')
+            ->first();
+
+        if (! $user) {
+            $this->error("No user found for company {$company->id} — cannot run billing pipeline.");
+
+            return SymfonyCommand::FAILURE;
+        }
+
         $year = $this->option('year') ?? now()->year;
         $month = $this->option('month') ?? now()->month;
 
-        if (!checkdate((int) $month, 1, (int) $year)) {
-            $this->error("Invalid temporal parameters provided: Month ({$month}) or Year ({$year}) out of bounds.");
+        if (! checkdate((int) $month, 1, (int) $year)) {
+            $this->error("Invalid period: year={$year}, month={$month}");
+
             return SymfonyCommand::FAILURE;
         }
 
         $billingDate = Carbon::create((int) $year, (int) $month, 1)->startOfMonth();
-        
-        $this->info("======================================================================");
-        $this->info(" Starting Billing Engine Pipeline Consolidation");
-        $this->info(" Target Period : " . $billingDate->format('F Y'));
-        $this->info(" Company Context: ID {$companyId}");
-        $this->info("======================================================================");
+        $generateRecurring = ! $this->option('skip-recurring');
 
-        // 3. Eager-Load Graph Framework to Mitigate N+1 Memory Exhaustion
-        $agreementsQuery = RentalAgreement::query()
-            ->where('status', 'active')
-            ->with([
-                'tenant', 
-                'apartment.building'
-            ]);
+        $this->info('======================================================================');
+        $this->info(' Monthly billing close');
+        $this->info(' Period        : '.$billingDate->format('F Y'));
+        $this->info(' Company       : '.$company->name.' ('.$company->id.')');
+        $this->info(' Recurring run : '.($generateRecurring ? 'yes' : 'skipped'));
+        $this->info('======================================================================');
 
-        $totalAgreements = $agreementsQuery->count();
+        $pipeline = app(BillingPipelineService::class, ['user' => $user]);
+        $result = $pipeline->runMonthlyClose($billingDate, $generateRecurring);
 
-        if ($totalAgreements === 0) {
-            $this->warn('Execution complete: Zero active rental agreements matched this company runtime scope.');
-            return SymfonyCommand::SUCCESS;
+        $consolidation = $result['consolidation'];
+        $pipelineStatus = $result['pipeline'];
+
+        $this->newLine();
+        $this->info('Billing run');
+        if ($result['billing_run']) {
+            $run = $result['billing_run'];
+            $this->line("  Run #{$run['run_number']} — status: {$run['status']}");
+        } else {
+            $this->line('  Skipped (consolidation only)');
         }
 
-        $this->info("Dispatched processing queues for {$totalAgreements} candidate lease structures...");
-        
-        $progressBar = $this->output->createProgressBar($totalAgreements);
-        $progressBar->start();
+        $this->newLine();
+        $this->info('Consolidation');
+        $this->line('  Created / updated : '.($consolidation['success'] ?? 0));
+        $this->line('  Appended          : '.($consolidation['appended'] ?? 0));
+        $this->line('  Skipped           : '.($consolidation['skipped'] ?? 0));
+        $this->line('  Draft invoices    : '.($consolidation['draft_invoices_for_period'] ?? 0));
 
-        $metrics = [
-            'success' => 0,
-            'skipped' => 0,
-            'failed'  => 0,
-        ];
-
-        // 4. Memory-Safe Chunking to Prevent Background Deallocation Collapses
-        $agreementsQuery->chunk(100, function ($agreements) use ($consolidationService, $billingDate, $progressBar, &$metrics) {
-            foreach ($agreements as $agreement) {
-                try {
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Process Single Isolated Invoice Generation Boundary
-                    |--------------------------------------------------------------------------
-                    | Internal database transactions are evaluated individually inside the
-                    | domain service level. A single contract failure will not crash or roll
-                    | back the entire macro batch process run.
-                    |--------------------------------------------------------------------------
-                    */
-                    $outcome = $consolidationService->consolidate($agreement, $billingDate);
-
-                    if ($outcome->wasCreated()) {
-                        $metrics['success']++;
-                    } else {
-                        $metrics['skipped']++;
-                    }
-                } catch (Throwable $exception) {
-                    $metrics['failed']++;
-                    
-                    Log::error('Critical billing engine processing failure for contract asset.', [
-                        'company_id'          => app('tenant.current_id'),
-                        'rental_agreement_id' => $agreement->id,
-                        'apartment_id'        => $agreement->apartment_id,
-                        'message'             => $exception->getMessage(),
-                        'trace'               => $exception->getTraceAsString(),
-                    ]);
-                }
-
-                $progressBar->advance();
+        if (($consolidation['failed'] ?? 0) > 0) {
+            $this->newLine();
+            $this->error('  Failed: '.$consolidation['failed']);
+            foreach ($consolidation['errors'] ?? [] as $error) {
+                $this->line('    - '.($error['agreement_number'] ?? $error['agreement_id']).': '.$error['message']);
             }
-        });
 
-        $progressBar->finish();
-        $this->newLine(2);
-
-        // 5. Render Command Execution Summary
-        $this->info("======================================================================");
-        $this->info(" Execution Summary Metrics");
-        $this->info("======================================================================");
-        $this->line(" Successfully Consolidated & Issued Invoices: " . $metrics['success']);
-        $this->line(" Skipped (Zero Balance Pending Line Items)  : " . $metrics['skipped']);
-        
-        if ($metrics['failed'] > 0) {
-            $this->error(" Failed Processing Runs (Check Error Logs)   : " . $metrics['failed']);
             return SymfonyCommand::INVALID;
         }
 
-        $this->info("Pipeline tracking loop completed cleanly.");
+        $pendingUtilities = $pipelineStatus['blocking_pending_utility_charges'] ?? 0;
+        if ($pendingUtilities > 0) {
+            $this->newLine();
+            $this->warn("{$pendingUtilities} utility charge(s) still await approval and were excluded.");
+        }
+
+        $this->newLine();
+        $this->info('Monthly billing close completed.');
+
         return SymfonyCommand::SUCCESS;
     }
 }

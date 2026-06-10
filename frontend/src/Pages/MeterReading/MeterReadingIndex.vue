@@ -6,7 +6,17 @@
     description="Capture, review, and approve utility consumption readings."
   >
     <template #actions>
+      <ErpButton
+        variant="primary"
+        :disabled="!selectedIds.length || bulkApproving"
+        :loading="bulkApproving"
+        @click="onBulkApprove"
+      >
+        Approve selected ({{ selectedIds.length }})
+      </ErpButton>
       <ErpButton variant="ghost" size="sm" :loading="loading" @click="fetchList(meta.current_page)">Refresh</ErpButton>
+      <ErpButton variant="secondary" :to="{ name: 'MeterReadingApprovalQueue' }">Approval queue</ErpButton>
+      <ErpButton variant="secondary" :to="{ name: 'MeterReadingBulkEntry' }">Bulk entry</ErpButton>
       <ErpButton @click="formModal.openCreate()">Capture reading</ErpButton>
     </template>
 
@@ -28,6 +38,7 @@
           <select v-model="smartFilters.status" class="erp-select" @change="syncAndFetch">
             <option value="">All</option>
             <option value="draft">Draft</option>
+            <option value="verified">Verified (ready)</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
           </select>
@@ -50,7 +61,17 @@
     </template>
 
     <template #table>
+      <AlertBanner
+        v-if="bulkMessage"
+        class="mb-4"
+        :variant="bulkMessageVariant"
+        :message="bulkMessage"
+        @dismiss="bulkMessage = ''"
+      />
       <DataTable
+        selectable
+        multi-select
+        v-model:selected-ids="selectedIds"
         :columns="columns"
         :rows="items"
         :loading="loading"
@@ -93,6 +114,7 @@
     :entity-id="formModal.state.id"
     @close="formModal.close()"
     @saved="onSaved"
+    @edit-existing="formModal.openEdit"
   />
 
   <ErpModal
@@ -117,7 +139,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMeterReadings } from '@/composables/useMeterReadings'
 import { useSmartFilters } from '@/composables/useSmartFilters'
 import { useFormModal } from '@/composables/useFormModal'
-import { compactActions, viewAction } from '@/composables/useTableActions'
+import { compactActions, viewAction, editAction } from '@/composables/useTableActions'
 import MeterReadingFormModal from '@/components/forms/MeterReadingFormModal.vue'
 import {
   WorklistLayout,
@@ -130,13 +152,20 @@ import {
   KpiCard,
   KpiStrip,
   ErpModal,
+  AlertBanner,
 } from '@/components/erp'
+import { useConfirm } from '@/composables/useConfirm'
 
 const route = useRoute()
 const router = useRouter()
+const { confirm } = useConfirm()
 const formModal = useFormModal()
 const approving = ref(null)
-const { items, loading, meta, filters, summary, fetchList, approve, reject, resetFilters } = useMeterReadings()
+const bulkApproving = ref(false)
+const selectedIds = ref([])
+const bulkMessage = ref('')
+const bulkMessageVariant = ref('success')
+const { items, loading, meta, filters, summary, fetchList, approve, bulkApprove, reject, resetFilters } = useMeterReadings()
 
 const { filters: smartFilters, chips, clearAll, removeChip, bindRoute } = useSmartFilters({
   defaults: { search: '', status: '', utility_type: '', anomalies_only: '' },
@@ -168,6 +197,7 @@ function readingActions(row) {
   const busy = approving.value === row.id
   return compactActions([
     viewAction('MeterReadingShow', row.id),
+    row.controls?.can_edit !== false && editAction(() => formModal.openEdit(row.id)),
     status !== 'approved' && {
       key: 'approve',
       label: 'Approve',
@@ -206,6 +236,35 @@ async function onApprove(row) {
     await approve(row)
   } finally {
     approving.value = null
+  }
+}
+
+async function onBulkApprove() {
+  if (!selectedIds.value.length) return
+
+  const ok = await confirm({
+    title: 'Approve selected readings',
+    message: `Approve ${selectedIds.value.length} reading(s)? Utility charges will be generated for each approved row.`,
+    confirmLabel: 'Approve',
+  })
+  if (!ok) return
+
+  bulkMessage.value = ''
+  bulkApproving.value = true
+  try {
+    const result = await bulkApprove(selectedIds.value)
+    const parts = []
+    if (result.approved) parts.push(`${result.approved} approved`)
+    if (result.skipped) parts.push(`${result.skipped} skipped`)
+    if (result.failed) parts.push(`${result.failed} failed`)
+    bulkMessageVariant.value = result.failed > 0 ? (result.approved > 0 ? 'warning' : 'error') : 'success'
+    bulkMessage.value = parts.length ? `${parts.join(', ')}.` : 'No readings approved.'
+    selectedIds.value = []
+  } catch (err) {
+    bulkMessageVariant.value = 'error'
+    bulkMessage.value = err?.response?.data?.message || 'Bulk approve failed.'
+  } finally {
+    bulkApproving.value = false
   }
 }
 function openReject(row) {

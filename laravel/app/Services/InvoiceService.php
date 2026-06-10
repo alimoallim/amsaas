@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Agreement;
 use App\Models\MonthlyInvoice;
 use App\Events\InvoiceIssued;
+use App\Services\Accounting\JournalEntryService;
+use App\Services\Collections\DelinquencyTrackingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -25,7 +27,14 @@ class InvoiceService
                 'finalized_at' => now(),
             ]);
 
-            $this->reapplyTenantCredits($invoice->fresh());
+            $fresh = $invoice->fresh();
+
+            app(JournalEntryService::class)->postInvoiceIssued(
+                $fresh,
+                auth()->id(),
+            );
+
+            $this->reapplyTenantCredits($fresh);
 
             DB::afterCommit(function () use ($invoice) {
                 event(new InvoiceIssued($invoice->fresh()));
@@ -60,6 +69,10 @@ class InvoiceService
 
         $isPaid = (float) $invoice->balance_due <= 0.009;
         $invoice->update(['status' => $isPaid ? 'paid' : 'partially_paid']);
+
+        if ($isPaid) {
+            app(DelinquencyTrackingService::class)->resolveForInvoice($invoice->fresh());
+        }
     }
 
     protected function reapplyTenantCredits(MonthlyInvoice $invoice): void

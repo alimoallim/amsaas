@@ -274,7 +274,14 @@ watch(
       localModel.pricing_strategy = suggested
     }
     if (suggested === 'metered' && !localModel.meter_type && type.category === 'utility') {
-      localModel.meter_type = 'electricity'
+      const label = `${type.name ?? ''} ${type.code ?? ''}`.toLowerCase()
+      if (label.includes('water')) {
+        localModel.meter_type = 'water'
+      } else if (label.includes('gas')) {
+        localModel.meter_type = 'gas'
+      } else {
+        localModel.meter_type = 'electricity'
+      }
     }
   }
 )

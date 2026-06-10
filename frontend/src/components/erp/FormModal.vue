@@ -11,20 +11,20 @@
         <div class="absolute inset-0 bg-slate-900/55 backdrop-blur-[2px]" @click="onBackdrop" />
 
         <div
-          class="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-xl"
+          class="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-xl dark:border-slate-700 dark:bg-slate-900"
           :class="sizeClass"
         >
-          <header class="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <header class="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-700">
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
-                <h2 :id="titleId" class="text-lg font-semibold text-slate-900">{{ title }}</h2>
+                <h2 :id="titleId" class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ title }}</h2>
                 <StatusBadge v-if="state" :status="state" :label="state" />
               </div>
-              <p v-if="subtitle" class="mt-0.5 text-sm text-slate-500">{{ subtitle }}</p>
+              <p v-if="subtitle" class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{{ subtitle }}</p>
             </div>
             <button
               type="button"
-              class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
               aria-label="Close"
               @click="requestClose"
             >
@@ -34,13 +34,17 @@
             </button>
           </header>
 
-          <div class="erp-form-modal-body min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div
+            class="erp-form-modal-body min-h-0 flex-1 overflow-y-auto px-5 py-4"
+            @input.capture="markTouched"
+            @change.capture="markTouched"
+          >
             <slot />
           </div>
 
           <footer
             v-if="showFooter"
-            class="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/90 px-5 py-4 sm:flex-row sm:justify-end"
+            class="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/90 px-5 py-4 sm:flex-row sm:justify-end dark:border-slate-700 dark:bg-slate-800/50"
           >
             <slot name="footer">
               <ErpButton variant="secondary" type="button" @click="requestClose">{{ cancelLabel }}</ErpButton>
@@ -72,9 +76,11 @@
 </template>
 
 <script setup>
-import { computed, useId } from 'vue'
+import { computed, useId, provide, watch, onUnmounted } from 'vue'
 import ErpButton from './ErpButton.vue'
 import StatusBadge from './StatusBadge.vue'
+import { useModalCloseGuard, MODAL_REQUEST_CLOSE_KEY } from '@/composables/useModalCloseGuard'
+import { useConfirmState } from '@/composables/useConfirm'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -88,13 +94,29 @@ const props = defineProps({
   savingDraft: { type: Boolean, default: false },
   showFooter: { type: Boolean, default: true },
   showSaveDraft: { type: Boolean, default: false },
-  closeOnBackdrop: { type: Boolean, default: true },
+  /** Off by default — outside click does not close form modals */
+  closeOnBackdrop: { type: Boolean, default: false },
+  /** Escape key requests a guarded close */
+  closeOnEscape: { type: Boolean, default: true },
+  /** Prompt when dirty or user has typed in the form */
+  confirmBeforeClose: { type: Boolean, default: true },
   dirty: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['close', 'save', 'save-draft'])
 
 const titleId = useId()
+const { state: confirmState } = useConfirmState()
+
+const { markTouched, requestClose } = useModalCloseGuard({
+  open: () => props.open,
+  dirty: () => props.dirty,
+  confirmBeforeClose: () => props.confirmBeforeClose,
+  onClose: () => emit('close'),
+})
+
+provide(MODAL_REQUEST_CLOSE_KEY, requestClose)
+defineExpose({ requestClose })
 
 const sizeClass = computed(
   () =>
@@ -104,14 +126,33 @@ const sizeClass = computed(
       xl: 'sm:max-w-2xl',
       '2xl': 'sm:max-w-4xl',
       full: 'sm:max-w-6xl',
-    })[props.size] || 'sm:max-w-2xl'
+    })[props.size] || 'sm:max-w-2xl',
 )
-
-function requestClose() {
-  emit('close')
-}
 
 function onBackdrop() {
   if (props.closeOnBackdrop) requestClose()
 }
+
+function onEscapeKey(event) {
+  if (!props.open || !props.closeOnEscape || event.key !== 'Escape') return
+  if (confirmState.open) return
+  event.preventDefault()
+  requestClose()
+}
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen) {
+      document.addEventListener('keydown', onEscapeKey)
+    } else {
+      document.removeEventListener('keydown', onEscapeKey)
+    }
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', onEscapeKey)
+})
 </script>

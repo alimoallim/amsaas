@@ -5,6 +5,7 @@ namespace App\Http\Requests\Api\V1;
 use App\Http\Requests\Api\V1\Concerns\ValidatesAgreementBilling;
 use App\Models\Agreement;
 use App\Models\Apartment;
+use App\Models\MonthlyInvoice;
 use App\Models\RentalAgreement;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -134,6 +135,13 @@ class UpdateRentalAgreementRequest extends FormRequest
             'contract_file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
             'notes'         => ['nullable', 'string'],
             'special_terms' => ['nullable', 'string'],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Critical change acknowledgement (active agreements with issued invoices)
+            |--------------------------------------------------------------------------
+            */
+            'confirm_critical_changes' => ['sometimes', 'boolean'],
         ], $this->agreementBillingRules());
     }
 
@@ -167,14 +175,17 @@ class UpdateRentalAgreementRequest extends FormRequest
                 }
             }
 
-            // 1. Active Agreements Restrictions
-            if ($agreement->status === Agreement::STATUS_ACTIVE) {
-                $restrictedFields = ['apartment_id', 'tenant_id', 'start_date'];
-                foreach ($restrictedFields as $field) {
-                    if ($this->has($field)) {
-                        $validator->errors()->add($field, 'This field cannot be modified after agreement activation.');
-                    }
-                }
+            // 1. Critical changes on active agreements with issued invoices require confirmation
+            if (
+                $agreement->status === Agreement::STATUS_ACTIVE
+                && $this->hasCriticalFieldChanges($agreement)
+                && $this->hasIssuedInvoices($agreement)
+                && ! $this->boolean('confirm_critical_changes')
+            ) {
+                $validator->errors()->add(
+                    'confirm_critical_changes',
+                    'This agreement has issued invoices. Confirm to change the unit, tenant, or start date.'
+                );
             }
 
             // 2. Prevent Illegal Status Transitions
@@ -240,6 +251,13 @@ class UpdateRentalAgreementRequest extends FormRequest
             $merge['auto_renew'] = filter_var($this->auto_renew, FILTER_VALIDATE_BOOLEAN);
         }
 
+        if ($this->has('confirm_critical_changes')) {
+            $merge['confirm_critical_changes'] = filter_var(
+                $this->confirm_critical_changes,
+                FILTER_VALIDATE_BOOLEAN
+            );
+        }
+
         foreach (['includes_water', 'includes_electricity', 'includes_internet'] as $field) {
             if ($this->has($field)) {
                 $merge[$field] = filter_var($this->{$field}, FILTER_VALIDATE_BOOLEAN);
@@ -247,6 +265,42 @@ class UpdateRentalAgreementRequest extends FormRequest
         }
 
         $this->merge($merge);
+    }
+
+    protected function hasCriticalFieldChanges(Agreement $agreement): bool
+    {
+        if ($this->filled('apartment_id') && $this->apartment_id !== $agreement->apartment_id) {
+            return true;
+        }
+
+        if ($this->filled('tenant_id') && $this->tenant_id !== $agreement->tenant_id) {
+            return true;
+        }
+
+        if (
+            $this->filled('start_date')
+            && $this->start_date !== $agreement->start_date?->toDateString()
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    protected function hasIssuedInvoices(Agreement $agreement): bool
+    {
+        return MonthlyInvoice::query()
+            ->where('company_id', $agreement->company_id)
+            ->where('contract_type', 'rental')
+            ->where('contract_id', $agreement->id)
+            ->whereIn('status', [
+                'issued',
+                'finalized',
+                'partially_paid',
+                'paid',
+                'overdue',
+            ])
+            ->exists();
     }
 
     protected function resolveRentalAgreement(): ?RentalAgreement

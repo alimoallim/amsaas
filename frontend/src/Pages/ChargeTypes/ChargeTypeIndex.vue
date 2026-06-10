@@ -62,11 +62,11 @@
         </template>
 
         <template #cell-name="{ row }">
-          <span class="font-medium text-slate-900">{{ row.name }}</span>
+          <span class="font-medium text-slate-900 dark:text-slate-100">{{ row.name }}</span>
         </template>
 
         <template #cell-code="{ row }">
-          <code class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">{{ row.code }}</code>
+          <code class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ row.code }}</code>
         </template>
 
         <template #cell-category="{ row }">
@@ -74,12 +74,12 @@
         </template>
 
         <template #cell-billing="{ row }">
-          <span class="text-xs text-slate-600 capitalize">{{ row.billing_frequency || row.calculation_method || '—' }}</span>
+          <span class="text-xs capitalize text-slate-600 dark:text-slate-400">{{ row.billing_frequency || row.calculation_method || '—' }}</span>
         </template>
 
         <template #cell-ledger="{ row }">
-          <code v-if="row.ledger_account_code" class="text-xs">{{ row.ledger_account_code }}</code>
-          <span v-else class="text-xs text-slate-400">—</span>
+          <code v-if="row.ledger_account_code" class="text-xs text-slate-700 dark:text-slate-300">{{ row.ledger_account_code }}</code>
+          <span v-else class="text-xs text-slate-400 dark:text-slate-500">—</span>
         </template>
 
         <template #cell-status="{ row }">

@@ -24,6 +24,11 @@ class InvoiceLineItem extends Model
         return $this->belongsTo(MonthlyInvoice::class);
     }
 
+    public function chargeType(): BelongsTo
+    {
+        return $this->belongsTo(ChargeType::class);
+    }
+
     /**
      * Dynamic reference linking back to source origins (e.g. Utility Readings, Fees).
      */

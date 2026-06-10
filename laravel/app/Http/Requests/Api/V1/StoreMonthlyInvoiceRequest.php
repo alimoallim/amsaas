@@ -41,6 +41,11 @@ class StoreMonthlyInvoiceRequest extends FormRequest
             ],
             'line_items.*.quantity' => ['required_with:line_items', 'numeric', 'min:0.001'],
             'line_items.*.unit_price' => ['required_with:line_items', 'numeric', 'min:0.01'],
+            'line_items.*.charge_type_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('charge_types', 'id')->where('company_id', $companyId),
+            ],
         ];
     }
 

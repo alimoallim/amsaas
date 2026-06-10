@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MeterReading extends Model
 {
@@ -274,6 +275,14 @@ class MeterReading extends Model
         );
     }
 
+    public function utilityCharges(): HasMany
+    {
+        return $this->hasMany(
+            Charge::class,
+            'meter_reading_id'
+        );
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Helpers
@@ -335,6 +344,34 @@ class MeterReading extends Model
 
             $this->status ===
             self::STATUS_VERIFIED;
+    }
+
+    public function hasLockedUtilityCharges(): bool
+    {
+        return $this->utilityCharges()
+            ->where(function ($query) {
+                $query->whereNotNull('invoice_id')
+                    ->orWhereIn('status', [
+                        Charge::STATUS_INVOICED,
+                        Charge::STATUS_PAID,
+                        Charge::STATUS_PARTIALLY_PAID,
+                    ]);
+            })
+            ->exists();
+    }
+
+    public function canBeEdited(): bool
+    {
+        if ($this->hasLockedUtilityCharges()) {
+            return false;
+        }
+
+        return in_array($this->status, [
+            self::STATUS_DRAFT,
+            self::STATUS_VERIFIED,
+            self::STATUS_APPROVED,
+            self::STATUS_REJECTED,
+        ], true);
     }
 
     /*

@@ -7,6 +7,8 @@ use App\Models\MonthlyInvoice;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\User;
+use App\Services\Accounting\JournalEntryService;
+use App\Services\Accounting\PostingRuleService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -18,12 +20,51 @@ class PaymentService
     ) {}
 
     /**
+     * Record a buyer payment (e.g. sale deposit) without invoice allocation.
+     *
+     * @param  array{buyer_id: string, amount: float|string, payment_date: string, payment_method: string, reference_number?: string, notes?: string}  $data
+     */
+    public function recordBuyerPayment(User $user, array $data): Payment
+    {
+        $amount = round((float) $data['amount'], 2);
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => ['Payment amount must be greater than zero.'],
+            ]);
+        }
+
+        return Payment::create(array_merge([
+            'company_id' => $user->company_id,
+            'tenant_id' => null,
+            'buyer_id' => $data['buyer_id'],
+            'receipt_number' => $this->generateReceiptNumber(),
+            'amount' => $amount,
+            'payment_date' => $data['payment_date'],
+            'payment_method' => $data['payment_method'],
+            'reference_number' => $data['reference_number'] ?? null,
+            'status' => 'completed',
+            'notes' => $data['notes'] ?? null,
+            'recorded_by' => $user->id,
+        ], app(PostingRuleService::class)->receiptAccountAttributes($data)))->load('buyer');
+    }
+
+    /**
      * Record a tenant payment and allocate FIFO to open rental invoices.
      *
      * @param  array{tenant_id: string, amount: float|string, payment_date: string, payment_method: string, reference_number?: string, notes?: string}  $data
      */
     public function recordPayment(User $user, array $data): Payment
     {
+        $purpose = $data['payment_purpose'] ?? Payment::PURPOSE_RENT;
+
+        if ($purpose === Payment::PURPOSE_SECURITY_DEPOSIT) {
+            return app(RentalDepositService::class)->recordSecurityDeposit($user, $data);
+        }
+
+        if ($purpose === Payment::PURPOSE_DEPOSIT_REFUND) {
+            return app(RentalDepositService::class)->refundSecurityDeposit($user, $data);
+        }
+
         return DB::transaction(function () use ($user, $data) {
             $amount = round((float) $data['amount'], 2);
             if ($amount <= 0) {
@@ -34,19 +75,21 @@ class PaymentService
 
             $this->reapplyUnallocatedPayments($user->company_id, $data['tenant_id']);
 
-            $payment = Payment::create([
+            $payment = Payment::create(array_merge([
                 'company_id' => $user->company_id,
                 'tenant_id' => $data['tenant_id'],
                 'buyer_id' => null,
+                'agreement_id' => null,
                 'receipt_number' => $this->generateReceiptNumber(),
                 'amount' => $amount,
                 'payment_date' => $data['payment_date'],
                 'payment_method' => $data['payment_method'],
                 'reference_number' => $data['reference_number'] ?? null,
                 'status' => 'completed',
+                'payment_purpose' => Payment::PURPOSE_RENT,
                 'notes' => $data['notes'] ?? null,
                 'recorded_by' => $user->id,
-            ]);
+            ], app(PostingRuleService::class)->receiptAccountAttributes($data)));
 
             $this->allocateToOpenInvoices($user->company_id, $data['tenant_id'], $payment, $amount);
 
@@ -64,6 +107,7 @@ class PaymentService
                 ->where('company_id', $companyId)
                 ->where('tenant_id', $tenantId)
                 ->where('status', 'completed')
+                ->where('payment_purpose', Payment::PURPOSE_RENT)
                 ->with('allocations')
                 ->orderBy('payment_date')
                 ->orderBy('created_at')
@@ -99,6 +143,14 @@ class PaymentService
 
     public function resultMessage(Payment $payment): string
     {
+        if ($payment->payment_purpose === Payment::PURPOSE_SECURITY_DEPOSIT) {
+            return 'Security deposit recorded and posted to customer deposits liability (2120).';
+        }
+
+        if ($payment->payment_purpose === Payment::PURPOSE_DEPOSIT_REFUND) {
+            return 'Security deposit refund recorded and posted from customer deposits liability.';
+        }
+
         ['allocated' => $allocated, 'unallocated' => $unallocated] = $this->allocationSummary($payment);
 
         if ($unallocated <= 0.009) {
@@ -163,11 +215,16 @@ class PaymentService
                 continue;
             }
 
-            PaymentAllocation::create([
+            $allocation = PaymentAllocation::query()->create([
                 'payment_id' => $payment->id,
                 'monthly_invoice_id' => $invoice->id,
                 'amount_allocated' => $allocationAmount,
             ]);
+
+            app(JournalEntryService::class)->postPaymentAllocation(
+                $allocation,
+                $payment->recorded_by,
+            );
 
             $this->invoiceService->applyPayment($invoice, $allocationAmount);
             $remaining = round($remaining - $allocationAmount, 2);

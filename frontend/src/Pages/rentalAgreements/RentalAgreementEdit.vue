@@ -71,6 +71,8 @@ const form = reactive({
 
   rent_charge_model_id: '',
   recurring_charges: [],
+  notes: '',
+  special_terms: '',
 })
 
 /*
@@ -137,6 +139,9 @@ async function loadAgreement() {
     const billing = mapBillingFromApi(data?.billing)
     form.rent_charge_model_id = billing.rent_charge_model_id
     form.recurring_charges = billing.recurring_charges
+
+    form.notes = data?.notes?.agreement_notes ?? ''
+    form.special_terms = data?.notes?.special_terms ?? ''
 
   } catch (error) {
 
@@ -209,25 +214,37 @@ async function initializePage() {
 |--------------------------------------------------------------------------
 */
 
-async function submitForm() {
-
+async function submitForm({ confirmCriticalChanges = false } = {}) {
   loading.value = true
-
   errors.value = {}
   pageError.value = ''
 
   try {
-    const isActive = agreement.value?.status?.value === 'active'
-
     await api.put(
       `/rental-agreements/${agreementId}`,
-      buildRentalAgreementPayload(form, { isActive, forUpdate: true }),
+      buildRentalAgreementPayload(form, { forUpdate: true, confirmCriticalChanges }),
     )
 
     router.push({ name: 'RentalAgreementShow', params: { id: agreementId } })
   } catch (error) {
     if (error.response?.status === 422) {
       errors.value = error.response.data.errors ?? {}
+
+      if (errors.value.confirm_critical_changes && !confirmCriticalChanges) {
+        const { confirm } = useConfirm()
+        const ok = await confirm({
+          title: 'Issued invoices on this agreement',
+          message:
+            'This agreement has issued invoices. Unit, tenant, or start date changes will not alter issued invoices but will update future billing. Continue?',
+          confirmLabel: 'Save changes',
+          variant: 'primary',
+        })
+        if (ok) {
+          loading.value = false
+          return submitForm({ confirmCriticalChanges: true })
+        }
+      }
+
       pageError.value =
         firstFormError(errors.value)
         || error.response.data.message
@@ -295,106 +312,50 @@ onMounted(() => {
 
 <template>
  
-    <div class="space-y-6">
-      <!-- Header -->
-      <div
-        class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
-      >
-        <div>
-          <p
-            class="text-sm font-medium text-slate-500"
-          >
-            Rental Agreements
-          </p>
-
-          <div
-            class="mt-1 flex flex-wrap items-center gap-3"
-          >
-            <h1
-              class="text-3xl font-bold tracking-tight text-slate-900"
-            >
-              Edit Rental Agreement
-            </h1>
-
-            <span
-              v-if="agreement?.agreement_number"
-              class="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700"
-            >
-              {{ agreement.agreement_number }}
-            </span>
-          </div>
-
-          <p
-            class="mt-2 text-sm text-slate-500"
-          >
-            Manage legal, financial, and operational rental agreement details.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          @click="cancelEdit"
-        >
-          Back to Agreements
-        </button>
-      </div>
-
-      <!-- Agreement Status -->
-      <div
-        v-if="agreement?.status"
-        class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-      >
-        <div
-          class="flex flex-wrap items-center justify-between gap-4"
-        >
+    <div class="space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
           <div>
-            <p
-              class="text-xs font-semibold uppercase tracking-wide text-slate-500"
-            >
-              Agreement Status
-            </p>
-
-            <div
-              class="mt-2 flex items-center gap-3"
-            >
+            <p class="text-xs font-medium text-slate-500">Rental Agreements</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <h1 class="text-xl font-bold tracking-tight text-slate-900">Edit Rental Agreement</h1>
               <span
-                class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide"
-                :class="{
-                  'bg-emerald-100 text-emerald-700':
-                    agreement.status.value === 'active',
-
-                  'bg-amber-100 text-amber-700':
-                    agreement.status.value === 'draft',
-
-                  'bg-rose-100 text-rose-700':
-                    agreement.status.value === 'terminated',
-
-                  'bg-slate-100 text-slate-700':
-                    agreement.status.value !== 'active'
-                    && agreement.status.value !== 'draft'
-                    && agreement.status.value !== 'terminated',
-                }"
+                v-if="agreement?.agreement_number"
+                class="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700"
               >
-                {{ agreement.status.label }}
-              </span>
-
-              <span
-                class="text-sm text-slate-500"
-              >
-                {{ agreement.apartment?.unit_number }}
+                {{ agreement.agreement_number }}
               </span>
             </div>
           </div>
-
-          <div
-            v-if="agreement.status.value === 'active'"
-            class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700"
-          >
-            Active agreements restrict modification of protected legal fields.
-          </div>
+          <template v-if="agreement?.status">
+            <span
+              class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+              :class="{
+                'bg-emerald-100 text-emerald-700': agreement.status.value === 'active',
+                'bg-amber-100 text-amber-700': agreement.status.value === 'draft',
+                'bg-rose-100 text-rose-700': agreement.status.value === 'terminated',
+                'bg-slate-100 text-slate-700':
+                  agreement.status.value !== 'active'
+                  && agreement.status.value !== 'draft'
+                  && agreement.status.value !== 'terminated',
+              }"
+            >
+              {{ agreement.status.label }}
+            </span>
+            <span v-if="agreement.apartment?.unit_number" class="text-xs text-slate-500">
+              Unit {{ agreement.apartment.unit_number }}
+            </span>
+          </template>
         </div>
+        <button
+          type="button"
+          class="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          @click="cancelEdit"
+        >
+          Back
+        </button>
       </div>
+
 
       <div
         v-if="pageError"

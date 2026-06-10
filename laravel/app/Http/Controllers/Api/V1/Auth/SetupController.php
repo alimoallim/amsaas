@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 
 use App\Models\Company;
 use App\Models\User;
+use App\Services\Accounting\ChartOfAccountsService;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -188,6 +189,8 @@ class SetupController extends Controller
             | Generate Sanctum Token
             |--------------------------------------------------------------------------
             */
+
+            app(ChartOfAccountsService::class)->seedDefaults($company, $user->id);
 
             $token =
                 $user

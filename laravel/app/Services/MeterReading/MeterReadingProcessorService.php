@@ -4,6 +4,7 @@ namespace App\Services\MeterReading;
 
 use App\Support\Money;
 use App\Services\Billing\GenerateChargeService;
+use App\Models\Charge;
 use App\Models\Meter;
 use App\Models\MeterReading;
 use App\Models\User;
@@ -77,10 +78,10 @@ class MeterReadingProcessorService
             |--------------------------------------------------------------------------
             */
 
-            $previousReading =
-                $this->resolvePreviousReading(
-                    meter: $meter
-                );
+            $previousReading = $this->resolvePreviousReadingForDate(
+                $meter,
+                \Carbon\Carbon::parse($data['reading_date'])->toDateString(),
+            );
 
             /*
             |--------------------------------------------------------------------------
@@ -283,9 +284,94 @@ class MeterReadingProcessorService
     | Approve Reading
     |--------------------------------------------------------------------------
     */
-public function approve(
-    MeterReading $reading
-): MeterReading {
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function update(MeterReading $reading, array $data): MeterReading
+    {
+        if (! $reading->canBeEdited()) {
+            throw ValidationException::withMessages([
+                'reading' => [
+                    $reading->hasLockedUtilityCharges()
+                        ? 'This reading is linked to invoiced utility charges and cannot be edited. Void the invoice first or create a corrective reading on a new date.'
+                        : 'This reading cannot be edited in its current state.',
+                ],
+            ]);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $wasApproved = $reading->isApproved();
+            $wasRejected = $reading->isRejected();
+
+            $meter = Meter::query()
+                ->where('company_id', $this->user->company_id)
+                ->findOrFail($data['meter_id'] ?? $reading->meter_id);
+
+            $this->validateMeterStatus($meter);
+
+            $previousReading = $this->resolvePreviousReadingForDate(
+                $meter,
+                $data['reading_date'] ?? $reading->reading_date->toDateString(),
+                $reading->id,
+            );
+
+            $currentReading = Money::toScale(
+                (string) ($data['current_reading'] ?? $reading->current_reading),
+                4
+            );
+
+            $consumption = $this->calculateConsumption($previousReading, $currentReading);
+
+            $anomaly = $this->detectAnomalies(
+                $meter,
+                $previousReading,
+                $currentReading,
+                $consumption
+            );
+
+            $newStatus = $anomaly['detected']
+                ? MeterReading::STATUS_DRAFT
+                : MeterReading::STATUS_VERIFIED;
+
+            $reading->update([
+                'meter_id' => $meter->id,
+                'building_id' => $meter->building_id,
+                'apartment_id' => $meter->apartment_id,
+                'reading_date' => $data['reading_date'] ?? $reading->reading_date,
+                'previous_reading' => $previousReading,
+                'current_reading' => $data['current_reading'] ?? $reading->current_reading,
+                'consumption' => $consumption,
+                'reading_type' => $data['reading_type'] ?? $reading->reading_type,
+                'reading_source' => $data['reading_source'] ?? $reading->reading_source,
+                'notes' => array_key_exists('notes', $data) ? $data['notes'] : $reading->notes,
+                'status' => $newStatus,
+                'anomaly_detected' => $anomaly['detected'],
+                'anomaly_reason' => $anomaly['reason'],
+                'approved_by' => null,
+                'approved_at' => null,
+                'updated_by' => $this->user->id,
+            ]);
+
+            if ($wasApproved || $wasRejected) {
+                $this->removeUninvoicedUtilityCharges($reading);
+            }
+
+            $this->syncMeter($meter, $reading->fresh());
+
+            DB::commit();
+
+            return $reading->fresh();
+        } catch (Throwable $exception) {
+            DB::rollBack();
+            throw $exception;
+        }
+    }
+
+    public function approve(
+        MeterReading $reading
+    ): MeterReading {
 
     if (
         $reading->isApproved()
@@ -406,19 +492,40 @@ public function approve(
 
     ): string {
 
-        $latestReading =
-            $meter->readings()
+        return $this->resolvePreviousReadingForDate(
+            $meter,
+            now()->toDateString(),
+        );
+    }
 
-                ->latest(
-                    'reading_date'
-                )
+    public function getPreviousReadingForDate(
+        Meter $meter,
+        string $readingDate,
+        ?string $excludeReadingId = null,
+    ): string {
+        return $this->resolvePreviousReadingForDate($meter, $readingDate, $excludeReadingId);
+    }
 
-                ->first();
+    public function getAverageConsumption(Meter $meter): string
+    {
+        return $this->calculateAverageConsumption($meter);
+    }
 
-        if (
-            $latestReading
-        ) {
+    protected function resolvePreviousReadingForDate(
+        Meter $meter,
+        string $readingDate,
+        ?string $excludeReadingId = null,
+    ): string {
+        $latestReading = $meter->readings()
+            ->when(
+                $excludeReadingId,
+                fn ($query) => $query->where('id', '!=', $excludeReadingId)
+            )
+            ->whereDate('reading_date', '<', $readingDate)
+            ->latest('reading_date')
+            ->first();
 
+        if ($latestReading) {
             return Money::toScale((string) $latestReading->current_reading, 4);
         }
 
@@ -560,6 +667,19 @@ public function approve(
     | Sync Meter Operational State
     |--------------------------------------------------------------------------
     */
+
+    protected function removeUninvoicedUtilityCharges(MeterReading $reading): void
+    {
+        Charge::query()
+            ->where('meter_reading_id', $reading->id)
+            ->whereNull('invoice_id')
+            ->whereIn('status', [
+                Charge::STATUS_PENDING,
+                Charge::STATUS_APPROVED,
+                Charge::STATUS_DRAFT,
+            ])
+            ->delete();
+    }
 
     protected function syncMeter(
 

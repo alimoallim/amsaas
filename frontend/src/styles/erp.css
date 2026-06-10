@@ -6,25 +6,34 @@
 
 @layer components {
   .erp-page {
-    @apply mx-auto max-w-[1400px] space-y-5;
+    @apply mx-auto min-w-0 max-w-[1400px] space-y-5;
   }
 
   .erp-input {
     @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition;
     @apply placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20;
+    @apply dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500;
+    @apply dark:focus:border-indigo-400 dark:focus:ring-indigo-400/25;
   }
 
   .erp-input--error {
     @apply border-red-400 focus:border-red-500 focus:ring-red-500/20;
+    @apply dark:border-red-500/70 dark:focus:border-red-400 dark:focus:ring-red-400/25;
   }
 
   .erp-select {
     @apply block w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-9 text-sm text-slate-900 shadow-sm transition;
     @apply focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20;
+    @apply dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100;
+    @apply dark:focus:border-indigo-400 dark:focus:ring-indigo-400/25;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2394a3b8' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 12px center;
     background-size: 12px;
+  }
+
+  html[data-theme="dark"] .erp-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236e7681' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
   }
 
   .erp-date-input {
@@ -33,10 +42,12 @@
 
   .erp-date-input__trigger:disabled {
     @apply cursor-not-allowed bg-slate-50 text-slate-500;
+    @apply dark:bg-slate-800/60 dark:text-slate-400;
   }
 
   .erp-date-input__icon-btn {
     @apply absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600;
+    @apply dark:hover:bg-slate-700 dark:hover:text-slate-200;
   }
 
   .erp-date-input__icon-btn:disabled {
@@ -45,10 +56,12 @@
 
   .erp-date-input__clear-btn {
     @apply absolute right-8 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600;
+    @apply dark:hover:bg-slate-700 dark:hover:text-slate-200;
   }
 
   .erp-date-picker {
     @apply rounded-xl border border-slate-200 bg-white p-3 shadow-xl;
+    @apply dark:border-slate-600 dark:bg-slate-900;
   }
 
   .erp-date-picker__header {
@@ -56,11 +69,12 @@
   }
 
   .erp-date-picker__title {
-    @apply flex-1 text-center text-sm font-semibold text-slate-900;
+    @apply flex-1 text-center text-sm font-semibold text-slate-900 dark:text-slate-100;
   }
 
   .erp-date-picker__nav {
     @apply rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800;
+    @apply dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100;
   }
 
   .erp-date-picker__weekdays {
@@ -68,7 +82,7 @@
   }
 
   .erp-date-picker__weekday {
-    @apply py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400;
+    @apply py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500;
   }
 
   .erp-date-picker__grid {
@@ -77,34 +91,41 @@
 
   .erp-date-picker__day {
     @apply h-9 rounded-lg text-sm font-medium text-slate-700 transition hover:bg-indigo-50 hover:text-indigo-700;
+    @apply dark:text-slate-300 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-300;
   }
 
   .erp-date-picker__day--muted {
     @apply text-slate-300 hover:bg-slate-50 hover:text-slate-400;
+    @apply dark:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-500;
   }
 
   .erp-date-picker__day--today {
-    @apply ring-1 ring-indigo-200;
+    @apply ring-1 ring-indigo-200 dark:ring-indigo-700;
   }
 
   .erp-date-picker__day--selected {
     @apply bg-indigo-600 text-white hover:bg-indigo-600 hover:text-white;
+    @apply dark:bg-indigo-500 dark:hover:bg-indigo-500;
   }
 
   .erp-date-picker__day--disabled {
     @apply cursor-not-allowed text-slate-200 hover:bg-transparent hover:text-slate-200;
+    @apply dark:text-slate-700 dark:hover:text-slate-700;
   }
 
   .erp-date-picker__footer {
     @apply mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3;
+    @apply dark:border-slate-700;
   }
 
   .erp-date-picker__action {
     @apply rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100;
+    @apply dark:text-slate-400 dark:hover:bg-slate-800;
   }
 
   .erp-date-picker__action--primary {
     @apply bg-indigo-600 text-white hover:bg-indigo-700;
+    @apply dark:bg-indigo-500 dark:hover:bg-indigo-400;
   }
 
   .erp-search-select {
@@ -113,10 +134,12 @@
 
   .erp-search-select__trigger:disabled {
     @apply cursor-not-allowed bg-slate-50 text-slate-500;
+    @apply dark:bg-slate-800/60 dark:text-slate-400;
   }
 
   .erp-search-select__chevron {
     @apply absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600;
+    @apply dark:hover:bg-slate-700 dark:hover:text-slate-200;
   }
 
   .erp-search-select__chevron:disabled {
@@ -125,33 +148,35 @@
 
   .erp-search-select__clear {
     @apply absolute right-8 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600;
+    @apply dark:hover:bg-slate-700 dark:hover:text-slate-200;
   }
 
   .erp-search-select__panel {
     @apply rounded-xl border border-slate-200 bg-white shadow-xl;
+    @apply dark:border-slate-600 dark:bg-slate-900;
   }
 
   .erp-search-select__option {
     @apply flex w-full flex-col gap-0.5 px-3 py-2 text-left transition hover:bg-indigo-50;
+    @apply dark:hover:bg-indigo-950/40;
   }
 
   .erp-search-select__option--active {
-    @apply bg-indigo-50;
+    @apply bg-indigo-50 dark:bg-indigo-950/50;
   }
 
   .erp-search-select__option-label {
-    @apply text-sm font-medium text-slate-900;
+    @apply text-sm font-medium text-slate-900 dark:text-slate-100;
   }
 
   .erp-search-select__option-hint {
-    @apply text-xs text-slate-500;
+    @apply text-xs text-slate-500 dark:text-slate-400;
   }
 
   .erp-label {
-    @apply mb-1 block text-sm font-medium text-slate-700;
+    @apply mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300;
   }
 
-  /* Consistent field layout in modals and transactional forms */
   .erp-form-grid {
     @apply grid w-full grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2;
   }
@@ -177,7 +202,7 @@
   }
 
   .erp-table-row-hover {
-    @apply transition-colors hover:bg-slate-50/80;
+    @apply transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50;
   }
 
   .erp-tabs {
@@ -186,7 +211,52 @@
 
   .erp-tab {
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30;
+    @apply dark:focus-visible:ring-indigo-400/30;
   }
+}
+
+/*
+ * Dark table cells — outside @layer so these beat inline Tailwind utilities
+ * on slot content (e.g. text-slate-900 on charge type rows).
+ */
+html[data-theme="dark"] .erp-table-cell .text-slate-900,
+.dark .erp-table-cell .text-slate-900 {
+  color: rgb(241 245 249);
+}
+
+html[data-theme="dark"] .erp-table-cell .text-slate-800,
+.dark .erp-table-cell .text-slate-800 {
+  color: rgb(226 232 240);
+}
+
+html[data-theme="dark"] .erp-table-cell .text-slate-700,
+.dark .erp-table-cell .text-slate-700 {
+  color: rgb(203 213 225);
+}
+
+html[data-theme="dark"] .erp-table-cell .text-slate-600,
+.dark .erp-table-cell .text-slate-600 {
+  color: rgb(148 163 184);
+}
+
+html[data-theme="dark"] .erp-table-cell .text-slate-500,
+.dark .erp-table-cell .text-slate-500 {
+  color: rgb(148 163 184);
+}
+
+html[data-theme="dark"] .erp-table-cell .text-slate-400,
+.dark .erp-table-cell .text-slate-400 {
+  color: rgb(100 116 139);
+}
+
+html[data-theme="dark"] .erp-table-cell code,
+.dark .erp-table-cell code {
+  color: rgb(203 213 225);
+}
+
+html[data-theme="dark"] .erp-table-cell .bg-slate-100,
+.dark .erp-table-cell .bg-slate-100 {
+  background-color: rgb(30 41 59);
 }
 
 .erp-fade-enter-active,

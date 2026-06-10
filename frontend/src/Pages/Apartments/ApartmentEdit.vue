@@ -200,24 +200,50 @@
                     <line x1="12" y1="12" x2="16" y2="14"/>
                   </svg>
                 </div>
-                <h3 class="section-title">Pricing & Commercial</h3>
+                <h3 class="section-title">{{ pricingSectionTitle }}</h3>
               </div>
+              <p v-if="pricingHint" class="mb-3 text-xs text-slate-500">{{ pricingHint }}</p>
               <div class="compact-grid compact-grid--3">
                 <div class="field-group" v-if="form.listing_type === 'rental' || form.listing_type === 'hybrid'">
-                  <label class="compact-label compact-label--sm">Market Rent Price</label>
+                  <label class="compact-label compact-label--sm">
+                    Market Rent Price <span class="text-red-500">*</span>
+                  </label>
                   <div class="input-prefix">
                     <span class="prefix-symbol">{{ form.currency === 'USD' ? '$' : 'Sh' }}</span>
-                    <input v-model.number="form.market_rent_price" type="number" step="0.01" class="compact-input compact-input--prefix" placeholder="0.00">
+                    <input
+                      v-model.number="form.market_rent_price"
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      class="compact-input compact-input--prefix"
+                      :class="{ 'input-error': fieldError('market_rent_price') }"
+                      placeholder="0.00"
+                    >
                   </div>
+                  <p v-if="fieldError('market_rent_price')" class="field-error">{{ fieldError('market_rent_price') }}</p>
                 </div>
                 <div class="field-group" v-if="form.listing_type === 'sale' || form.listing_type === 'hybrid'">
-                  <label class="compact-label compact-label--sm">Market Sale Price</label>
+                  <label class="compact-label compact-label--sm">
+                    Market Sale Price <span class="text-red-500">*</span>
+                  </label>
                   <div class="input-prefix">
                     <span class="prefix-symbol">{{ form.currency === 'USD' ? '$' : 'Sh' }}</span>
-                    <input v-model.number="form.market_sale_price" type="number" step="0.01" class="compact-input compact-input--prefix" placeholder="0.00">
+                    <input
+                      v-model.number="form.market_sale_price"
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      class="compact-input compact-input--prefix"
+                      :class="{ 'input-error': fieldError('market_sale_price') }"
+                      placeholder="0.00"
+                    >
                   </div>
+                  <p v-if="fieldError('market_sale_price')" class="field-error">{{ fieldError('market_sale_price') }}</p>
                 </div>
-                <div class="field-group">
+                <div
+                  v-if="form.listing_type === 'rental' || form.listing_type === 'hybrid'"
+                  class="field-group"
+                >
                   <label class="compact-label compact-label--sm">Security Deposit</label>
                   <div class="input-prefix">
                     <span class="prefix-symbol">{{ form.currency === 'USD' ? '$' : 'Sh' }}</span>
@@ -332,12 +358,12 @@
                 <span class="summary-value">{{ form.bedrooms }}/{{ form.bathrooms }}</span>
               </div>
               <div class="summary-divider"></div>
-              <div class="summary-item summary-highlight" v-if="form.listing_type === 'rental'">
+              <div class="summary-item summary-highlight" v-if="form.listing_type === 'rental' || form.listing_type === 'hybrid'">
                 <span class="summary-label">Rent</span>
                 <span class="summary-value">{{ formatCurrency(form.market_rent_price, form.currency) }}</span>
               </div>
-              <div class="summary-item summary-highlight" v-if="form.listing_type === 'sale'">
-                <span class="summary-label">Price</span>
+              <div class="summary-item summary-highlight" v-if="form.listing_type === 'sale' || form.listing_type === 'hybrid'">
+                <span class="summary-label">Sale price</span>
                 <span class="summary-value">{{ formatCurrency(form.market_sale_price, form.currency) }}</span>
               </div>
             </div>
@@ -384,7 +410,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { computed, reactive, ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '../../services/api'
 import { useConfirm } from '@/composables/useConfirm'
@@ -399,6 +425,7 @@ const saving = ref(false)
 const buildings = ref([])
 const errorMessage = ref('')
 const successMessage = ref('')
+const fieldErrors = ref({})
 
 const form = reactive({
   building_id: '',
@@ -421,7 +448,54 @@ const form = reactive({
   notes: '',
 })
 
+const pricingSectionTitle = computed(() => {
+  if (form.listing_type === 'sale') return 'Sale pricing'
+  if (form.listing_type === 'rental') return 'Rental pricing'
+  if (form.listing_type === 'hybrid') return 'Rental & sale pricing'
+  return 'Pricing & Commercial'
+})
+
+const pricingHint = computed(() => {
+  if (form.listing_type === 'sale') return 'Enter the asking sale price for this unit.'
+  if (form.listing_type === 'rental') return 'Enter the monthly market rent for this unit.'
+  if (form.listing_type === 'hybrid') return 'Enter both monthly rent and sale price for this hybrid listing.'
+  return ''
+})
+
 // Helpers
+function fieldError(key) {
+  const e = fieldErrors.value[key]
+  return Array.isArray(e) ? e[0] : e || ''
+}
+
+function priceForPayload(value) {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+function validatePricing() {
+  const errors = {}
+  const needsRent = form.listing_type === 'rental' || form.listing_type === 'hybrid'
+  const needsSale = form.listing_type === 'sale' || form.listing_type === 'hybrid'
+  if (needsRent && !priceForPayload(form.market_rent_price)) {
+    errors.market_rent_price = 'Market rent price is required for rental listings.'
+  }
+  if (needsSale && !priceForPayload(form.market_sale_price)) {
+    errors.market_sale_price = 'Market sale price is required for sale listings.'
+  }
+  fieldErrors.value = errors
+  return Object.keys(errors).length === 0
+}
+
+watch(
+  () => form.listing_type,
+  (type) => {
+    if (type !== 'rental' && type !== 'hybrid') form.market_rent_price = null
+    if (type !== 'sale' && type !== 'hybrid') form.market_sale_price = null
+    fieldErrors.value = {}
+  },
+)
+
 const formatStatus = (status) => status?.replaceAll('_', ' ') || 'Unknown'
 const formatListingType = (type) => {
   const map = { rental: 'For Rent', sale: 'For Sale', hybrid: 'Both', not_listed: 'Not Listed' }
@@ -493,15 +567,40 @@ const submitForm = async () => {
   saving.value = true
   errorMessage.value = ''
   successMessage.value = ''
+  fieldErrors.value = {}
+
+  if (!validatePricing()) {
+    errorMessage.value = 'Please enter the required pricing for the selected listing type.'
+    saving.value = false
+    return
+  }
+
   try {
-    const payload = { ...form, floor: form.floor || null, area_sqm: form.area_sqm || null }
-    if (form.listing_type !== 'rental' && form.listing_type !== 'hybrid') payload.market_rent_price = null
-    if (form.listing_type !== 'sale' && form.listing_type !== 'hybrid') payload.market_sale_price = null
+    const payload = {
+      ...form,
+      floor: form.floor || null,
+      area_sqm: form.area_sqm || null,
+      market_rent_price:
+        form.listing_type === 'rental' || form.listing_type === 'hybrid'
+          ? priceForPayload(form.market_rent_price)
+          : null,
+      market_sale_price:
+        form.listing_type === 'sale' || form.listing_type === 'hybrid'
+          ? priceForPayload(form.market_sale_price)
+          : null,
+    }
     const response = await api.put(`/apartments/${apartmentId}`, payload)
     successMessage.value = response.data.message || 'Apartment updated successfully.'
     setTimeout(() => { successMessage.value = '' }, 3000)
   } catch (error) {
     console.error(error)
+    if (error?.response?.status === 422) {
+      fieldErrors.value = error.response.data.errors ?? {}
+      const firstField = Object.values(fieldErrors.value).flat()[0]
+      errorMessage.value =
+        firstField || error.response.data.message || 'Please fix the highlighted fields.'
+      return
+    }
     errorMessage.value = error?.response?.data?.message || 'Failed to update apartment.'
   } finally {
     saving.value = false
@@ -918,6 +1017,15 @@ onMounted(async () => {
   font-weight: 500;
   color: #64748b;
 }
+.input-error {
+  border-color: #f87171 !important;
+}
+.field-error {
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: #dc2626;
+}
+
 .compact-input--prefix {
   padding-left: 1.75rem;
   width: 100%;

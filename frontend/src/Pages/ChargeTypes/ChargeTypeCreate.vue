@@ -98,7 +98,7 @@
           <div>
             <label for="billing_frequency" class="block text-sm font-medium text-slate-700">Cycle Frequency <span class="text-red-500">*</span></label>
             <select id="billing_frequency" v-model="form.billing_frequency" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none">
-              <option value="one_time">One-Time Event</option>
+              <option value="one_time">One-time payment</option>
               <option value="daily">Daily Sweeps</option>
               <option value="weekly">Weekly Runs</option>
               <option value="monthly">Monthly Cycle Run</option>
@@ -142,8 +142,28 @@
 
         <div class="grid grid-cols-1 gap-6 md:grid-cols-3 mt-6">
           <div class="md:col-span-2">
-            <label for="ledger_account_code" class="block text-sm font-medium text-slate-700">Double-Entry Ledger Chart Account Code</label>
-            <input id="ledger_account_code" type="text" v-model="form.ledger_account_code" placeholder="e.g., 4000-INC-RENT" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono focus:border-slate-500 focus:outline-none" />
+            <label for="ledger_account_code" class="block text-sm font-medium text-slate-700">GL revenue account code</label>
+            <input
+              id="ledger_account_code"
+              type="text"
+              v-model="form.ledger_account_code"
+              list="coa-revenue-codes"
+              placeholder="4100"
+              class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono focus:border-slate-500 focus:outline-none"
+            />
+            <p class="mt-1 text-xs text-slate-500">
+              Posted as credit when invoices with this charge type are issued.
+              Defaults by category: rent <code class="font-mono">4100</code>,
+              utility <code class="font-mono">4110</code>,
+              service <code class="font-mono">4140</code>.
+              <RouterLink :to="{ name: 'Accounts' }" class="text-indigo-600 hover:underline">Chart of accounts</RouterLink>
+            </p>
+            <datalist id="coa-revenue-codes">
+              <option value="4100">Rental Income</option>
+              <option value="4110">Utility Recovery Income</option>
+              <option value="4140">Service Charge Income</option>
+              <option value="4150">Property Sale Revenue</option>
+            </datalist>
           </div>
 
           <div>
@@ -243,7 +263,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import api from '@/services/api'
 
@@ -282,6 +302,13 @@ const form = reactive({
   sort_order: 0,
   status: 'active'
 })
+
+watch(
+  () => form.billing_frequency,
+  (frequency) => {
+    form.is_recurring = frequency !== 'one_time'
+  },
+)
 
 function autoGenerateCode() {
   if (form.name) {

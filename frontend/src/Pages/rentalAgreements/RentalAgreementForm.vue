@@ -25,47 +25,64 @@
       </span>
     </div>
 
-    <!-- ══════════════════════════════════════════════════════════
-         TWO-PANEL BODY
-    ══════════════════════════════════════════════════════════ -->
-    <div class="form-body">
+    <!-- Compact scroll area + horizontal section tabs -->
+    <p
+      v-if="isEdit && initialStatus === 'active' && !isReadonly"
+      class="form-active-hint"
+      role="status"
+    >
+      Active agreement — unit, tenant, and dates can be corrected. Changes to draft invoices are applied automatically; issued invoices are not modified.
+    </p>
 
-      <!-- ── Section Navigation (left) ────────────────────────── -->
-      <nav class="section-nav" aria-label="Form sections">
-        <div class="section-nav__inner">
-          <a
-            v-for="(sec, i) in sections"
-            :key="sec.id"
-            :href="`#sec-${sec.id}`"
-            class="sec-nav-item"
-            :class="{ 'sec-nav-item--active': activeSection === sec.id }"
-            @click.prevent="scrollToSection(sec.id)"
-          >
-            <span class="sec-nav-item__num">{{ i + 1 }}</span>
-            <span class="sec-nav-item__icon" v-html="sec.icon"></span>
-            <span class="sec-nav-item__label">{{ sec.label }}</span>
-          </a>
-        </div>
-      </nav>
+    <nav class="section-tabs" aria-label="Form sections">
+      <button
+        v-for="sec in sections"
+        :key="sec.id"
+        type="button"
+        class="section-tab"
+        :class="{ 'section-tab--active': activeSection === sec.id }"
+        @click="scrollToSection(sec.id)"
+      >
+        {{ sec.label }}
+      </button>
+    </nav>
 
-      <!-- ── Scrollable Form Sections (right) ─────────────────── -->
-      <div class="form-sections" ref="sectionsEl">
+    <div class="form-shell" ref="sectionsEl">
 
-        <!-- ─── 1. Assignment ──────────────────────────────────── -->
-        <section class="form-section" id="sec-assignment" data-section="assignment">
-          <div class="section-header">
-            <div class="section-header__icon section-header__icon--indigo">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-              </svg>
-            </div>
-            <div>
-              <h3 class="section-header__title">Assignment</h3>
-              <p class="section-header__sub">Link an apartment and tenant to this agreement</p>
+        <!-- ─── Agreement Information ─────────────────────────── -->
+        <section class="form-block" id="sec-agreement" data-section="agreement">
+          <header class="form-block__head">
+            <h3 class="form-block__title">Agreement Information</h3>
+            <p class="form-block__sub">Lifecycle status for this contract</p>
+          </header>
+          <div class="grid-3">
+            <div class="field-group col-span-3">
+              <label class="field-label">Status</label>
+              <div class="status-select-grid status-select-grid--compact">
+                <button
+                  v-for="s in statusOptionsForMode"
+                  :key="s.value"
+                  type="button"
+                  :disabled="isReadonly"
+                  :class="['status-option', `status-option--${s.value}`, { 'status-option--selected': form.status === s.value }]"
+                  @click="!isReadonly && (form.status = s.value)"
+                >
+                  <span class="status-option__dot"></span>
+                  {{ s.label }}
+                </button>
+              </div>
+              <p v-if="errors.status" class="field-error">{{ errors.status[0] }}</p>
             </div>
           </div>
+        </section>
 
-          <div class="field-grid">
+        <!-- ─── Property, Unit & Tenant ───────────────────────── -->
+        <section class="form-block" id="sec-property" data-section="property">
+          <header class="form-block__head">
+            <h3 class="form-block__title">Property & Tenant</h3>
+            <p class="form-block__sub">Building, unit, and lessee assignment</p>
+          </header>
+          <div class="grid-3">
             <!-- Building (filters units) -->
             <div class="field-group">
               <label class="field-label">
@@ -78,7 +95,7 @@
                 </svg>
                 <select
                   v-model="selectedBuildingId"
-                  :disabled="isReadonly || !canEditCoreFields"
+                  :disabled="isReadonly"
                   class="field-select field-select--icon"
                 >
                   <option value="">Select building first…</option>
@@ -105,7 +122,7 @@
               <ErpSearchSelect
                 v-model="form.apartment_id"
                 :options="apartmentOptions"
-                :disabled="isReadonly || !canEditCoreFields || !selectedBuildingId"
+                :disabled="isReadonly || !selectedBuildingId"
                 :loading="apartmentsLoading"
                 remote
                 placeholder="Select unit…"
@@ -125,7 +142,6 @@
               <p v-if="errors.apartment_id" class="field-error">{{ errors.apartment_id[0] }}</p>
             </div>
 
-            <!-- Tenant -->
             <div class="field-group">
               <label class="field-label">
                 Tenant
@@ -137,7 +153,7 @@
                 </svg>
                 <select
                   v-model="form.tenant_id"
-                  :disabled="isReadonly || !canEditCoreFields"
+                  :disabled="isReadonly"
                   class="field-select field-select--icon"
                 >
                   <option value="">Select a tenant…</option>
@@ -149,96 +165,103 @@
                   <polyline points="6 9 12 15 18 9"/>
                 </svg>
               </div>
-              <p v-if="tenants.length === 0" class="field-hint field-hint--warn">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                No tenants available
-              </p>
+              <p v-if="tenants.length === 0" class="field-hint field-hint--warn">No tenants available</p>
               <p v-if="errors.tenant_id" class="field-error">{{ errors.tenant_id[0] }}</p>
             </div>
           </div>
         </section>
 
-        <!-- ─── 2. Agreement Period ────────────────────────────── -->
-        <section class="form-section" id="sec-period" data-section="period">
-          <div class="section-header">
-            <div class="section-header__icon section-header__icon--blue">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-              </svg>
-            </div>
-            <div>
-              <h3 class="section-header__title">Agreement Period</h3>
-              <p class="section-header__sub">Set the duration and current status of this agreement</p>
-            </div>
-          </div>
-
-          <!-- Date range visual -->
-          <div class="date-range-card">
-            <div class="date-range-card__field">
-              <p class="date-range-card__label">Start Date</p>
+        <!-- ─── Dates & Terms ─────────────────────────────────── -->
+        <section class="form-block" id="sec-terms" data-section="terms">
+          <header class="form-block__head">
+            <h3 class="form-block__title">Dates & Terms</h3>
+            <p class="form-block__sub">Lease period, payment schedule, and renewal policy</p>
+          </header>
+          <div class="grid-3">
+            <div class="field-group">
+              <label class="field-label">Start date <span class="field-required">*</span></label>
               <ErpDateInput
                 v-model="form.start_date"
-                :disabled="isReadonly || !canEditCoreFields"
-                input-class="field-date"
-                placeholder="Start date"
+                :disabled="isReadonly"
+                input-class="field-date field-date--compact"
+                placeholder="Start"
               />
               <p v-if="errors.start_date" class="field-error">{{ errors.start_date[0] }}</p>
             </div>
-            <div class="date-range-card__arrow">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-              </svg>
-            </div>
-            <div class="date-range-card__field">
-              <p class="date-range-card__label">End Date</p>
+            <div class="field-group">
+              <label class="field-label">End date</label>
               <ErpDateInput
                 v-model="form.end_date"
                 :disabled="isReadonly"
-                input-class="field-date"
-                placeholder="End date"
+                input-class="field-date field-date--compact"
+                placeholder="End"
                 :min="form.start_date || ''"
               />
               <p v-if="errors.end_date" class="field-error">{{ errors.end_date[0] }}</p>
             </div>
-          </div>
-
-          <!-- Status -->
-          <div class="field-group" style="max-width: 320px; margin-top: 16px;">
-            <label class="field-label">Agreement Status</label>
-            <div class="status-select-grid">
-              <button
-                v-for="s in statusOptionsForMode"
-                :key="s.value"
-                type="button"
-                :disabled="isReadonly || !canEditCoreFields"
-                :class="['status-option', `status-option--${s.value}`, { 'status-option--selected': form.status === s.value }]"
-                @click="!isReadonly && canEditCoreFields && (form.status = s.value)"
-              >
-                <span class="status-option__dot"></span>
-                {{ s.label }}
-              </button>
+            <div class="field-group">
+              <label class="field-label">Payment due day</label>
+              <div class="stepper-wrap stepper-wrap--compact">
+                <button
+                  type="button"
+                  class="stepper-btn"
+                  :disabled="isReadonly || form.payment_due_day <= 1"
+                  @click="form.payment_due_day = Math.max(1, (form.payment_due_day || 1) - 1)"
+                >−</button>
+                <input
+                  v-model.number="form.payment_due_day"
+                  type="number"
+                  min="1"
+                  max="28"
+                  :disabled="isReadonly"
+                  placeholder="1"
+                  class="field-input field-input--stepper"
+                />
+                <button
+                  type="button"
+                  class="stepper-btn"
+                  :disabled="isReadonly || form.payment_due_day >= 28"
+                  @click="form.payment_due_day = Math.min(28, (form.payment_due_day || 1) + 1)"
+                >+</button>
+              </div>
+              <p v-if="errors.payment_due_day" class="field-error">{{ errors.payment_due_day[0] }}</p>
             </div>
-            <p v-if="errors.status" class="field-error">{{ errors.status[0] }}</p>
+            <div class="field-group">
+              <label class="field-label">Renewal notice (days)</label>
+              <div class="stepper-wrap stepper-wrap--compact">
+                <button type="button" class="stepper-btn" :disabled="isReadonly || form.renewal_notice_days <= 1"
+                  @click="form.renewal_notice_days = Math.max(1, (form.renewal_notice_days || 30) - 1)">−</button>
+                <input
+                  v-model.number="form.renewal_notice_days"
+                  type="number"
+                  min="1"
+                  max="365"
+                  :disabled="isReadonly"
+                  placeholder="30"
+                  class="field-input field-input--stepper"
+                />
+                <button type="button" class="stepper-btn" :disabled="isReadonly || form.renewal_notice_days >= 365"
+                  @click="form.renewal_notice_days = Math.min(365, (form.renewal_notice_days || 30) + 1)">+</button>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Auto renewal</label>
+              <label class="toggle-chip" :class="{ 'toggle-chip--on': form.auto_renew, 'toggle-chip--disabled': isReadonly }">
+                <input v-model="form.auto_renew" type="checkbox" :disabled="isReadonly" class="sr-only" />
+                <span>{{ form.auto_renew ? 'Enabled' : 'Disabled' }}</span>
+              </label>
+            </div>
           </div>
         </section>
 
-        <!-- ─── 3. Financial Terms ─────────────────────────────── -->
-        <section class="form-section" id="sec-financial" data-section="financial">
-          <div class="section-header">
-            <div class="section-header__icon section-header__icon--emerald">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
-              </svg>
-            </div>
-            <div>
-              <h3 class="section-header__title">Financial Terms</h3>
-              <p class="section-header__sub">Monthly rent, deposit, currency, and payment schedule</p>
-            </div>
-          </div>
+        <!-- ─── Charges & Billing ─────────────────────────────── -->
+        <section class="form-block" id="sec-billing" data-section="billing">
+          <header class="form-block__head">
+            <h3 class="form-block__title">Charges & Billing</h3>
+            <p class="form-block__sub">Rent, deposits, and charge model lines</p>
+          </header>
 
-          <div class="field-grid">
-
-            <!-- Monthly Rent -->
+          <div class="grid-3">
             <div class="field-group">
               <label class="field-label">Monthly Rent <span class="field-required">*</span></label>
               <div class="input-affix-wrap">
@@ -294,117 +317,53 @@
               </div>
             </div>
 
-            <!-- Payment Due Day -->
+            <div class="field-group col-span-2">
+              <label class="field-label">Rent charge model</label>
+              <select
+                v-model="form.rent_charge_model_id"
+                :disabled="!canEditBilling || !rentChargeModels.length"
+                class="field-select"
+              >
+                <option value="">Default active rent model</option>
+                <option v-for="m in rentChargeModels" :key="m.id" :value="m.id">
+                  {{ m.name }} ({{ m.code }})
+                </option>
+              </select>
+              <p v-if="!rentChargeModels.length" class="field-hint field-hint--warn">
+                Create an active rent charge model under Finance → Charge Models.
+              </p>
+            </div>
             <div class="field-group">
-              <label class="field-label">Payment Due Day
-                <span class="field-hint-inline">of each month (1–28)</span>
-              </label>
-              <div class="stepper-wrap">
-                <button
-                  type="button"
-                  class="stepper-btn"
-                  :disabled="isReadonly || form.payment_due_day <= 1"
-                  @click="form.payment_due_day = Math.max(1, (form.payment_due_day || 1) - 1)"
-                >−</button>
-                <input
-                  v-model.number="form.payment_due_day"
-                  type="number"
-                  min="1"
-                  max="28"
-                  :disabled="isReadonly"
-                  placeholder="1"
-                  class="field-input field-input--stepper"
-                />
-                <button
-                  type="button"
-                  class="stepper-btn"
-                  :disabled="isReadonly || form.payment_due_day >= 28"
-                  @click="form.payment_due_day = Math.min(28, (form.payment_due_day || 1) + 1)"
-                >+</button>
-              </div>
-              <p v-if="errors.payment_due_day" class="field-error">{{ errors.payment_due_day[0] }}</p>
-            </div>
-          </div>
-        </section>
-
-        <!-- ─── 4. Recurring billing ───────────────────────────── -->
-        <section class="form-section" id="sec-billing" data-section="billing">
-          <div class="section-header">
-            <div class="section-header__icon section-header__icon--violet">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-              </svg>
-            </div>
-            <div>
-              <h3 class="section-header__title">Recurring billing</h3>
-              <p class="section-header__sub">Link charge models — rent uses monthly rent above; services use amounts below; utilities bill from meter readings</p>
+              <label class="field-label">Rent billed</label>
+              <p class="billing-inline-amount">{{ form.currency || 'USD' }} {{ form.monthly_rent || '0' }} / mo</p>
             </div>
           </div>
 
-          <div class="billing-panel">
-            <div class="billing-rent-card">
-              <div class="billing-rent-card__head">
-                <span class="billing-rent-card__title">Rent</span>
-                <span class="billing-rent-card__badge">From rental agreement</span>
-              </div>
-              <div class="field-grid">
-                <div class="field-group field-group--full">
-                  <label class="field-label">Rent charge model</label>
-                  <select
-                    v-model="form.rent_charge_model_id"
-                    :disabled="!canEditBilling || !rentChargeModels.length"
-                    class="field-select"
-                  >
-                    <option value="">Default active rent model</option>
-                    <option v-for="m in rentChargeModels" :key="m.id" :value="m.id">
-                      {{ m.name }} ({{ m.code }})
-                    </option>
-                  </select>
-                  <p v-if="!rentChargeModels.length" class="field-hint field-hint--warn">
-                    Create an active charge model with policy “Rent from rental agreement” under Finance → Charge Models.
-                  </p>
-                </div>
-                <div class="field-group">
-                  <label class="field-label">Amount billed</label>
-                  <p class="billing-rent-card__amount">
-                    {{ form.currency || 'USD' }} {{ form.monthly_rent || '0' }} / month
-                  </p>
-                  <p class="field-hint">Uses monthly rent from Financial Terms — not stored on the charge model.</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="billing-services">
+          <div class="billing-services billing-services--compact">
               <div class="billing-services__head">
-                <span class="billing-services__title">Additional charges & utilities</span>
+                <span class="billing-services__title">Additional charge models</span>
                 <div v-if="canEditBilling" class="billing-services__actions">
-                  <button type="button" class="btn-add-line" @click="addServiceRow">
-                    + Add service
-                  </button>
-                  <button type="button" class="btn-add-line btn-add-line--utility" @click="addUtilityRow">
-                    + Add utility
+                  <button type="button" class="btn-add-line" @click="addChargeRow">
+                    + Add charge model
                   </button>
                 </div>
               </div>
               <p class="field-hint billing-services__intro">
-                Service fees: flat monthly amounts (security, cleaning, parking).
-                Utilities: link metered charge models — consumption is billed from meter readings at month end.
+                Select any active charge model (flat fees, fixed amounts, or metered utilities). Metered models bill from approved meter readings at month end.
               </p>
 
               <div v-if="!form.recurring_charges?.length" class="billing-empty">
-                No additional charges yet. Add metered utilities (water, electricity) or flat service fees.
+                No additional charge models yet. Add fees or metered utilities configured under Finance → Charge Models.
               </div>
 
               <div
                 v-for="(row, index) in form.recurring_charges"
                 :key="row.id || `new-${index}`"
-                class="billing-line"
+                class="billing-line billing-line--compact"
               >
-                <div class="field-grid billing-line__grid">
-                  <div class="field-group field-group--full">
-                    <label class="field-label">
-                      {{ row.preferMetered ? 'Utility charge model' : 'Charge model' }}
-                    </label>
+                <div class="grid-3 billing-line__grid">
+                  <div class="field-group col-span-2">
+                    <label class="field-label">Charge model</label>
                     <select
                       v-model="row.charge_model_id"
                       :disabled="!canEditBilling"
@@ -465,77 +424,55 @@
                     />
                   </div>
                 </div>
-                <button
-                  v-if="canEditBilling"
-                  type="button"
-                  class="billing-line__remove"
-                  aria-label="Remove line"
-                  @click="removeRecurringRow(index)"
-                >
-                  Remove
-                </button>
+                <div v-if="canEditBilling" class="field-group billing-line__actions">
+                  <label class="field-label">&nbsp;</label>
+                  <button
+                    type="button"
+                    class="billing-line__remove"
+                    aria-label="Remove line"
+                    @click="removeRecurringRow(index)"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
-            </div>
           </div>
         </section>
 
-        <!-- ─── 5. Renewal Policy ─────────────────────────────── -->
-        <section class="form-section" id="sec-renewal" data-section="renewal">
-          <div class="section-header">
-            <div class="section-header__icon section-header__icon--teal">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-              </svg>
+        <!-- ─── Notes ───────────────────────────────────────────── -->
+        <section class="form-block" id="sec-notes" data-section="notes">
+          <header class="form-block__head">
+            <h3 class="form-block__title">Notes</h3>
+            <p class="form-block__sub">Internal remarks and special contract terms</p>
+          </header>
+          <div class="notes-grid">
+            <div class="field-group">
+              <label class="field-label">Agreement notes</label>
+              <textarea
+                v-model="form.notes"
+                :disabled="isReadonly"
+                rows="3"
+                class="field-textarea field-textarea--compact"
+                placeholder="Internal notes visible to property managers…"
+              />
+              <p v-if="errors.notes" class="field-error">{{ errors.notes[0] }}</p>
             </div>
-            <div>
-              <h3 class="section-header__title">Renewal Policy</h3>
-              <p class="section-header__sub">Configure automatic renewal and notice period</p>
-            </div>
-          </div>
-
-          <div class="renewal-row">
-            <!-- Auto-renew toggle card -->
-            <label :class="['auto-renew-card', { 'auto-renew-card--on': form.auto_renew, 'auto-renew-card--disabled': isReadonly }]">
-              <input v-model="form.auto_renew" type="checkbox" :disabled="isReadonly" class="utility-card__check" />
-              <div>
-                <p class="auto-renew-card__title">Auto Renewal</p>
-                <p class="auto-renew-card__sub">Agreement renews automatically at expiry</p>
-              </div>
-              <div class="auto-renew-card__badge" :class="{ 'auto-renew-card__badge--on': form.auto_renew }">
-                {{ form.auto_renew ? 'Enabled' : 'Disabled' }}
-              </div>
-            </label>
-
-            <!-- Notice days -->
-            <div class="field-group" style="flex: 1; min-width: 200px;">
-              <label class="field-label">Renewal Notice Period
-                <span class="field-hint-inline">days before expiry</span>
-              </label>
-              <div class="stepper-wrap">
-                <button type="button" class="stepper-btn" :disabled="isReadonly || form.renewal_notice_days <= 1"
-                  @click="form.renewal_notice_days = Math.max(1, (form.renewal_notice_days || 30) - 1)">−</button>
-                <input
-                  v-model.number="form.renewal_notice_days"
-                  type="number"
-                  min="1"
-                  max="365"
-                  :disabled="isReadonly"
-                  placeholder="30"
-                  class="field-input field-input--stepper"
-                />
-                <button type="button" class="stepper-btn" :disabled="isReadonly || form.renewal_notice_days >= 365"
-                  @click="form.renewal_notice_days = Math.min(365, (form.renewal_notice_days || 30) + 1)">+</button>
-              </div>
+            <div class="field-group">
+              <label class="field-label">Special terms</label>
+              <textarea
+                v-model="form.special_terms"
+                :disabled="isReadonly"
+                rows="3"
+                class="field-textarea field-textarea--compact"
+                placeholder="Non-standard clauses or conditions…"
+              />
+              <p v-if="errors.special_terms" class="field-error">{{ errors.special_terms[0] }}</p>
             </div>
           </div>
         </section>
-
-      </div>
-      <!-- /form-sections -->
 
     </div>
-    <!-- /form-body -->
+    <!-- /form-shell -->
 
     <!-- ══════════════════════════════════════════════════════════
          STICKY ACTION BAR
@@ -573,6 +510,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import api from '@/services/api'
+import { useConfirm } from '@/composables/useConfirm'
 import { ErpDateInput, ErpSearchSelect } from '@/components/erp'
 import { useBuildingApartments } from '@/composables/useBuildingApartments'
 import { tenantDisplayName } from '@/utils/tenantDisplayName'
@@ -600,6 +538,8 @@ const props = defineProps({
   embedded: { type: Boolean, default: false },
 })
 const emit = defineEmits(['submit', 'cancel'])
+
+const { confirm } = useConfirm()
 
 const selectedBuildingId = ref('')
 const { apartments: buildingApartments, loading: apartmentsLoading, fetchApartments, apartmentToOption } = useBuildingApartments()
@@ -658,9 +598,54 @@ watch(selectedBuildingId, async (id, prev) => {
 /* ── Computed modes ──────────────────────────────────────────── */
 const isReadonly = computed(() => props.mode === 'readonly')
 const isEdit     = computed(() => props.mode === 'edit')
-const canEditCoreFields = computed(() => props.initialStatus !== 'active')
-/** Billing lines (services + metered utilities) stay editable on active agreements. */
+/** Billing lines stay editable unless the agreement is read-only (e.g. terminated). */
 const canEditBilling = computed(() => !isReadonly.value)
+
+const coreBaseline = ref(null)
+
+function captureCoreBaseline() {
+  if (coreBaseline.value || !isEdit.value) return
+  if (!props.form.apartment_id && !props.form.start_date) return
+
+  coreBaseline.value = {
+    apartment_id: String(props.form.apartment_id || ''),
+    tenant_id: String(props.form.tenant_id || ''),
+    start_date: props.form.start_date || '',
+  }
+}
+
+watch(
+  () => [props.form.apartment_id, props.form.tenant_id, props.form.start_date],
+  captureCoreBaseline,
+  { immediate: true },
+)
+
+function hasCriticalCoreChanges() {
+  if (!coreBaseline.value) return false
+
+  return (
+    String(props.form.apartment_id || '') !== coreBaseline.value.apartment_id
+    || String(props.form.tenant_id || '') !== coreBaseline.value.tenant_id
+    || (props.form.start_date || '') !== coreBaseline.value.start_date
+  )
+}
+
+function criticalChangeMessages() {
+  const lines = []
+  if (!coreBaseline.value) return lines
+
+  if (String(props.form.apartment_id || '') !== coreBaseline.value.apartment_id) {
+    lines.push('Unit assignment will change; draft invoices will point to the new unit.')
+  }
+  if (String(props.form.tenant_id || '') !== coreBaseline.value.tenant_id) {
+    lines.push('Tenant assignment will change for this agreement.')
+  }
+  if ((props.form.start_date || '') !== coreBaseline.value.start_date) {
+    lines.push('Start date will change; charge billing schedules will be recalculated.')
+  }
+
+  return lines
+}
 /* ── Section nav ─────────────────────────────────────────────── */
 const chargeModels = ref([])
 
@@ -668,18 +653,11 @@ const rentChargeModels = computed(() =>
   chargeModels.value.filter((m) => m.pricing_strategy === 'agreement_rent')
 )
 
-const utilityChargeModels = computed(() =>
-  chargeModels.value.filter((m) => m.pricing_strategy === 'metered')
-)
-
-const serviceChargeModels = computed(() =>
-  chargeModels.value.filter(
-    (m) => m.pricing_strategy !== 'agreement_rent' && m.pricing_strategy !== 'metered'
-  )
+const recurringChargeModels = computed(() =>
+  chargeModels.value.filter((m) => m.pricing_strategy !== 'agreement_rent')
 )
 
 function modelsForRow(row, index) {
-  const pool = row.preferMetered ? utilityChargeModels.value : serviceChargeModels.value
   const usedElsewhere = new Set(
     (props.form.recurring_charges ?? [])
       .filter((_, i) => i !== index)
@@ -687,7 +665,9 @@ function modelsForRow(row, index) {
       .filter(Boolean),
   )
 
-  return pool.filter((m) => m.id === row.charge_model_id || !usedElsewhere.has(m.id))
+  return recurringChargeModels.value.filter(
+    (m) => m.id === row.charge_model_id || !usedElsewhere.has(m.id),
+  )
 }
 
 async function loadChargeModels() {
@@ -713,14 +693,9 @@ function ensureBillingFields() {
   }
 }
 
-function addServiceRow() {
+function addChargeRow() {
   ensureBillingFields()
   props.form.recurring_charges.push(emptyRecurringChargeRow())
-}
-
-function addUtilityRow() {
-  ensureBillingFields()
-  props.form.recurring_charges.push({ ...emptyRecurringChargeRow(), preferMetered: true })
 }
 
 function removeRecurringRow(index) {
@@ -746,14 +721,14 @@ function recurringRowError(index, field) {
 }
 
 const sections = [
-  { id: 'assignment', label: 'Assignment',    icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>' },
-  { id: 'period',     label: 'Period',        icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' },
-  { id: 'financial',  label: 'Financial',     icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>' },
-  { id: 'billing',    label: 'Billing',       icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>' },
-  { id: 'renewal',    label: 'Renewal',       icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>' },
+  { id: 'agreement', label: 'Agreement' },
+  { id: 'property', label: 'Property & Tenant' },
+  { id: 'terms', label: 'Dates & Terms' },
+  { id: 'billing', label: 'Charges' },
+  { id: 'notes', label: 'Notes' },
 ]
 
-const activeSection = ref('assignment')
+const activeSection = ref('property')
 const sectionsEl    = ref(null)
 
 const scrollToSection = (id) => {
@@ -801,7 +776,7 @@ function tenantLabel(tenant) {
 }
 
 
-function handleSubmit() {
+async function handleSubmit() {
   if (Array.isArray(props.form.recurring_charges)) {
     props.form.recurring_charges = props.form.recurring_charges.filter(
       (row) => row.charge_model_id
@@ -810,7 +785,24 @@ function handleSubmit() {
   if (!props.form.status || !statusOptionsForMode.value.some((s) => s.value === props.form.status)) {
     props.form.status = 'draft'
   }
-  emit('submit')
+
+  let confirmCriticalChanges = false
+
+  if (isEdit.value && props.initialStatus === 'active' && hasCriticalCoreChanges()) {
+    const detail = criticalChangeMessages().join(' ')
+    const ok = await confirm({
+      title: 'Confirm agreement changes',
+      message: detail
+        ? `${detail} Issued invoices will not be changed. Save anyway?`
+        : 'These changes may affect future billing. Save anyway?',
+      confirmLabel: 'Save changes',
+      variant: 'primary',
+    })
+    if (!ok) return
+    confirmCriticalChanges = true
+  }
+
+  emit('submit', { confirmCriticalChanges })
 }
 </script>
 
@@ -863,8 +855,8 @@ function handleSubmit() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 20px 28px;
+  gap: 12px;
+  padding: 12px 18px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -924,84 +916,140 @@ function handleSubmit() {
 .mode-badge--readonly .mode-badge__dot { background: #9ca3af; }
 
 /* ════════════════════════════════════════════════════════════
-   Two-panel body
+   Compact layout shell
 ════════════════════════════════════════════════════════════ */
-.form-body {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+.form-active-hint {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #92400e;
+  background: #fffbeb;
+  border-bottom: 1px solid #fde68a;
 }
 
-/* ── Section Nav ─────────────────────────────────────────────── */
-.section-nav {
-  width: 192px;
+.section-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+  z-index: 8;
   flex-shrink: 0;
-  border-right: 1px solid var(--border);
-  background: #fafafa;
-  overflow-y: auto;
 }
 
-.section-nav__inner {
-  padding: 20px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.sec-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border-radius: var(--r-md);
-  text-decoration: none;
-  color: var(--text-3);
-  font-size: 13px;
-  font-weight: 500;
-  transition: background var(--ease), color var(--ease);
+.section-tab {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
   cursor: pointer;
+  transition: background var(--ease), color var(--ease), border-color var(--ease);
 }
-.sec-nav-item:hover { background: #f0f0f0; color: var(--text-2); }
-.sec-nav-item--active { background: var(--accent-lt); color: var(--accent); }
-
-.sec-nav-item__num {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: currentColor;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  opacity: .5;
+.section-tab:hover { border-color: #c7d2fe; color: var(--accent); }
+.section-tab--active {
+  background: var(--accent-lt);
+  border-color: #c7d2fe;
+  color: var(--accent);
 }
-.sec-nav-item--active .sec-nav-item__num { opacity: 1; }
 
-.sec-nav-item__icon { display: flex; align-items: center; flex-shrink: 0; }
-.sec-nav-item__label { white-space: nowrap; }
-
-/* ── Form Sections (scrollable) ──────────────────────────────── */
-.form-sections {
+.form-shell {
   flex: 1;
   overflow-y: auto;
   min-width: 0;
-  padding: 0 0 120px; /* space for action bar */
+  padding: 12px 14px 88px;
 }
 
-/* ════════════════════════════════════════════════════════════
-   Section
-════════════════════════════════════════════════════════════ */
-.form-section {
-  padding: 28px 32px;
-  border-bottom: 1px solid var(--border);
+.form-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  margin-bottom: 10px;
 }
-.form-section:last-child { border-bottom: none; }
 
-/* Section Header */
+.form-block__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.form-block__title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -.01em;
+}
+
+.form-block__sub {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.col-span-2 { grid-column: span 2; }
+.col-span-3 { grid-column: span 3; }
+
+.toggle-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all var(--ease);
+}
+.toggle-chip--on {
+  border-color: var(--accent);
+  background: var(--accent-lt);
+  color: var(--accent);
+}
+.toggle-chip--disabled { opacity: .6; cursor: not-allowed; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.billing-inline-amount {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-1);
+  margin: 0;
+  padding-top: 8px;
+}
+
+.billing-services--compact { margin-top: 10px; }
+
+/* Legacy section header (unused) */
 .section-header {
   display: flex;
   align-items: flex-start;
@@ -1062,20 +1110,25 @@ function handleSubmit() {
 }
 .billing-line {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 10px;
-  background: #fff;
+  border-radius: var(--r-md);
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #fafafa;
+}
+.billing-line--compact .billing-line__grid {
+  align-items: end;
 }
 .billing-line__remove {
-  margin-top: 8px;
+  height: 36px;
+  width: 100%;
   font-size: 12px;
   color: #b91c1c;
-  background: transparent;
-  border: 0;
+  background: #fff;
+  border: 1px solid #fecaca;
+  border-radius: var(--r-sm);
   cursor: pointer;
-  text-decoration: underline;
 }
+.billing-line__remove:hover { background: #fef2f2; }
 .field-group--full { grid-column: 1 / -1; }
 .section-header__icon--amber   { background: #fffbeb; color: #d97706; }
 .section-header__icon--teal    { background: #f0fdfa; color: #0d9488; }
@@ -1100,8 +1153,8 @@ function handleSubmit() {
 ════════════════════════════════════════════════════════════ */
 .field-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
 }
 
 .field-group {
@@ -1115,17 +1168,17 @@ function handleSubmit() {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text-2);
-  margin-bottom: 7px;
+  margin-bottom: 4px;
 }
 .field-required { color: var(--red); font-size: 13px; }
 .field-hint-inline { font-weight: 400; color: var(--text-3); font-size: 11.5px; }
 
 /* Base input */
 .field-input {
-  height: 42px;
+  height: 36px;
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -1170,7 +1223,7 @@ function handleSubmit() {
   z-index: 1;
 }
 .field-select {
-  height: 42px;
+  height: 36px;
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -1257,7 +1310,7 @@ function handleSubmit() {
 
 /* Date */
 .field-date {
-  height: 46px;
+  height: 36px;
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -1281,8 +1334,9 @@ function handleSubmit() {
   border-radius: var(--r-md);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
-  height: 42px;
+  height: 36px;
 }
+.stepper-wrap--compact { max-width: 160px; }
 .stepper-btn {
   width: 40px;
   height: 100%;
@@ -1363,8 +1417,12 @@ function handleSubmit() {
 .status-select-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   margin-top: 2px;
+}
+.status-select-grid--compact .status-option {
+  padding: 4px 10px;
+  font-size: 11.5px;
 }
 .status-option {
   display: inline-flex;
@@ -1600,8 +1658,16 @@ function handleSubmit() {
 ════════════════════════════════════════════════════════════ */
 .notes-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.field-textarea--compact {
+  min-height: 72px;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  resize: vertical;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -1621,8 +1687,8 @@ function handleSubmit() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 28px;
-  gap: 16px;
+  padding: 10px 16px;
+  gap: 12px;
 }
 .action-bar__left {
   display: flex;
@@ -1678,22 +1744,19 @@ function handleSubmit() {
   font-family: inherit;
 }
 
-.agreement-form--embedded .form-body {
-  flex-direction: column;
-}
-
-.agreement-form--embedded .section-nav {
-  display: none;
-}
-
-.agreement-form--embedded .form-sections {
+.agreement-form--embedded .form-shell {
   padding-bottom: 0;
 }
 
-.agreement-form--embedded .form-section {
-  padding: 20px 0;
+.agreement-form--embedded .form-block {
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
 }
 
+.agreement-form--embedded .grid-3,
 .agreement-form--embedded .field-grid,
 .agreement-form--embedded .notes-grid,
 .agreement-form--embedded .utility-grid {
@@ -1731,27 +1794,29 @@ function handleSubmit() {
    Responsive
 ════════════════════════════════════════════════════════════ */
 @media (max-width: 1024px) {
-  .section-nav { width: 160px; }
-  .field-grid  { grid-template-columns: 1fr; }
-  .notes-grid  { grid-template-columns: 1fr; }
-  .utility-grid { grid-template-columns: 1fr 1fr; }
+  .grid-3,
+  .field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .col-span-2,
+  .col-span-3 { grid-column: span 2; }
 }
 
 @media (max-width: 768px) {
-  .section-nav     { display: none; }
-  .form-header     { padding: 16px 18px; }
-  .form-section    { padding: 20px 18px; }
-  .action-bar__inner { padding: 12px 18px; }
-  .utility-grid    { grid-template-columns: 1fr; }
-  .date-range-card { flex-direction: column; gap: 14px; }
-  .date-range-card__arrow { transform: rotate(90deg); margin: 0; }
+  .form-header { padding: 10px 14px; }
+  .form-shell { padding: 10px 12px 72px; }
+  .grid-3,
+  .field-grid,
+  .notes-grid,
+  .utility-grid { grid-template-columns: 1fr; }
+  .col-span-2,
+  .col-span-3 { grid-column: span 1; }
+  .section-tabs { padding: 6px 10px; }
   .action-bar__info-text { display: none; }
-  .renewal-row { flex-direction: column; }
+  .stepper-wrap--compact { max-width: none; }
 }
 
 @media (max-width: 480px) {
   .form-header__sub { display: none; }
-  .status-select-grid { gap: 6px; }
-  .status-option { padding: 5px 10px; font-size: 11.5px; }
+  .form-block__sub { display: none; }
+  .status-option { padding: 4px 8px; font-size: 11px; }
 }
 </style>

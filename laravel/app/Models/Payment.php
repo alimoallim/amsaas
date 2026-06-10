@@ -14,7 +14,12 @@ use App\Models\Traits\BelongsToCompany;
 class Payment extends Model
 {
     use HasFactory, HasUuids, SoftDeletes,LogsActivity,BelongsToCompany;
-    
+
+    public const PURPOSE_RENT = 'rent';
+
+    public const PURPOSE_SECURITY_DEPOSIT = 'security_deposit';
+
+    public const PURPOSE_DEPOSIT_REFUND = 'deposit_refund';
 
     protected $guarded = ['id'];
 
@@ -39,6 +44,11 @@ class Payment extends Model
         return $this->belongsTo(Buyer::class);
     }
 
+    public function agreement(): BelongsTo
+    {
+        return $this->belongsTo(Agreement::class);
+    }
+
     public function recordedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by');
@@ -47,6 +57,11 @@ class Payment extends Model
     public function allocations(): HasMany
     {
         return $this->hasMany(PaymentAllocation::class);
+    }
+
+    public function salePaymentAllocations(): HasMany
+    {
+        return $this->hasMany(SalePaymentAllocation::class);
     }
 }
 

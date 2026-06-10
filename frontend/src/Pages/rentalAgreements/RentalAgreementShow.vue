@@ -70,6 +70,14 @@
           Sync to invoice
         </ErpButton>
         <ErpButton
+          v-if="canApplyDeposit"
+          variant="secondary"
+          size="sm"
+          @click="openApplyDepositModal"
+        >
+          Apply deposit
+        </ErpButton>
+        <ErpButton
           v-if="unpaidInvoices.length"
           variant="success"
           size="sm"
@@ -98,7 +106,18 @@
       <template #overview>
         <KpiStrip class="mb-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <KpiCard label="Monthly rent" :value="formatMoney(agreement.financials?.monthly_rent, currency)" />
-          <KpiCard label="Security deposit" :value="formatMoney(agreement.financials?.security_deposit, currency)" />
+          <KpiCard
+            label="Security deposit"
+            :value="formatMoney(agreement.financials?.security_deposit, currency)"
+            :caption="depositLedgerCaption"
+          />
+          <KpiCard
+            v-if="depositLedger"
+            label="Deposit on hand"
+            :value="formatMoney(depositLedger.available, currency)"
+            :caption="`Received ${formatMoney(depositLedger.received, currency)}`"
+            variant="accent"
+          />
           <KpiCard
             v-for="usage in billingSummary.utilityUsage"
             :key="usage.utility_type"
@@ -458,6 +477,36 @@
           </select>
         </FormField>
       </div>
+      <div v-else-if="confirm.action === 'apply-deposit'" class="mt-3 space-y-4">
+        <p class="text-sm text-slate-600">
+          Available deposit:
+          <span class="font-semibold tabular-nums text-slate-900">
+            {{ formatMoney(depositLedger?.available, currency) }}
+          </span>
+          <span class="text-slate-500"> — posts DR 2120 · CR 1120 (no cash)</span>
+        </p>
+        <FormField label="Invoice" required>
+          <select v-model="depositApplyForm.monthly_invoice_id" class="erp-select">
+            <option value="">Select invoice…</option>
+            <option v-for="inv in unpaidInvoices" :key="inv.id" :value="inv.id">
+              {{ inv.invoice_number }} · {{ inv.periodLabel }} · {{ formatMoney(inv.balance_due, currency) }} due
+            </option>
+          </select>
+        </FormField>
+        <FormField label="Amount to apply" required>
+          <input
+            v-model="depositApplyForm.amount"
+            type="number"
+            step="0.01"
+            min="0.01"
+            class="erp-input tabular-nums"
+            :placeholder="suggestedDepositApplyAmount"
+          />
+        </FormField>
+        <FormField label="Notes">
+          <textarea v-model="depositApplyForm.notes" rows="2" class="erp-input" placeholder="Optional" />
+        </FormField>
+      </div>
       <div v-else-if="confirm.action === 'payment'" class="mt-3 max-h-48 space-y-2 overflow-y-auto">
         <label
           v-for="inv in unpaidInvoices"
@@ -474,7 +523,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, defineComponent, h } from 'vue'
+import { ref, reactive, computed, watch, onMounted, defineComponent, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useRentalAgreements } from '@/composables/useRentalAgreements'
@@ -564,6 +613,12 @@ const generateForm = reactive({
 
 const paymentSelection = ref([])
 
+const depositApplyForm = reactive({
+  monthly_invoice_id: '',
+  amount: '',
+  notes: '',
+})
+
 const billingYears = computed(() => {
   const y = new Date().getFullYear()
   return [y - 1, y, y + 1]
@@ -571,6 +626,21 @@ const billingYears = computed(() => {
 
 const controls = computed(() => agreement.value?.controls || {})
 const currency = computed(() => agreement.value?.financials?.currency || 'USD')
+const depositLedger = computed(() => agreement.value?.financials?.deposit_ledger ?? null)
+const depositLedgerCaption = computed(() => {
+  const ledger = depositLedger.value
+  if (!ledger || ledger.received <= 0) {
+    return 'Contractual amount at lease start'
+  }
+  const parts = [`Received ${formatMoney(ledger.received, currency.value)}`]
+  if (ledger.applied > 0) {
+    parts.push(`applied ${formatMoney(ledger.applied, currency.value)}`)
+  }
+  if (ledger.refunded > 0) {
+    parts.push(`refunded ${formatMoney(ledger.refunded, currency.value)}`)
+  }
+  return parts.join(' · ')
+})
 
 const breadcrumbs = computed(() => [
   { label: 'Rental agreements', to: { name: 'RentalAgreementIndex' } },
@@ -639,6 +709,24 @@ const outstandingBalance = computed(() =>
 const unpaidInvoices = computed(() =>
   invoices.value.filter((inv) => Number(inv.balance_due) > 0 && inv.status !== 'paid')
 )
+
+const canApplyDeposit = computed(() => {
+  const available = Number(depositLedger.value?.available ?? 0)
+  return available > 0.009
+    && unpaidInvoices.value.length > 0
+    && agreement.value?.status?.value === 'active'
+})
+
+const selectedApplyInvoice = computed(() =>
+  unpaidInvoices.value.find((inv) => inv.id === depositApplyForm.monthly_invoice_id) ?? null,
+)
+
+const suggestedDepositApplyAmount = computed(() => {
+  const available = Number(depositLedger.value?.available ?? 0)
+  const balance = Number(selectedApplyInvoice.value?.balance_due ?? 0)
+  if (available <= 0 || balance <= 0) return ''
+  return Math.min(available, balance).toFixed(2)
+})
 
 const filteredInvoices = computed(() => {
   const q = invoiceSearch.value.trim().toLowerCase()
@@ -775,6 +863,23 @@ function openGenerateModal() {
   confirm.open = true
 }
 
+function openApplyDepositModal() {
+  const first = unpaidInvoices.value[0]
+  depositApplyForm.monthly_invoice_id = first?.id || ''
+  const available = Number(depositLedger.value?.available ?? 0)
+  const balance = Number(first?.balance_due ?? 0)
+  depositApplyForm.amount = available > 0 && balance > 0
+    ? Math.min(available, balance).toFixed(2)
+    : ''
+  depositApplyForm.notes = ''
+  confirm.action = 'apply-deposit'
+  confirm.title = 'Apply security deposit'
+  confirm.subtitle = 'Apply held deposit liability to an open invoice (no new cash receipt).'
+  confirm.confirmLabel = 'Apply deposit'
+  confirm.variant = 'primary'
+  confirm.open = true
+}
+
 function openPaymentModal() {
   paymentSelection.value = unpaidInvoices.value.map((i) => i.id)
   confirm.action = 'payment'
@@ -785,9 +890,28 @@ function openPaymentModal() {
   confirm.open = true
 }
 
+watch(
+  () => depositApplyForm.monthly_invoice_id,
+  () => {
+    if (confirm.action === 'apply-deposit') {
+      depositApplyForm.amount = suggestedDepositApplyAmount.value
+    }
+  },
+)
+
 async function runConfirm() {
   if (confirm.action === 'terminate' && !confirm.terminationReason.trim()) {
     return
+  }
+  if (confirm.action === 'apply-deposit') {
+    if (!depositApplyForm.monthly_invoice_id) {
+      pageError.value = 'Select an invoice to apply the deposit to.'
+      return
+    }
+    if (!depositApplyForm.amount || Number(depositApplyForm.amount) <= 0) {
+      pageError.value = 'Enter a valid amount.'
+      return
+    }
   }
   if (confirm.action === 'payment' && !paymentSelection.value.length) {
     return
@@ -817,6 +941,18 @@ async function runConfirm() {
       pageSuccess.value = data.message || 'Billing synced to invoice.'
       confirm.open = false
       await Promise.all([loadInvoices(), refreshAll()])
+    } else if (confirm.action === 'apply-deposit') {
+      const { data } = await api.post(
+        `/rental-agreements/${agreement.value.id}/apply-deposit`,
+        {
+          monthly_invoice_id: depositApplyForm.monthly_invoice_id,
+          amount: Number(depositApplyForm.amount),
+          notes: depositApplyForm.notes || undefined,
+        },
+      )
+      pageSuccess.value = data.message || 'Deposit applied to invoice.'
+      confirm.open = false
+      await refreshAll()
     } else if (confirm.action === 'payment') {
       await api.post('/invoices/bulk-mark-paid', { ids: paymentSelection.value })
       pageSuccess.value = 'Payment recorded.'

@@ -3,10 +3,30 @@
   <form v-else class="space-y-5" @submit.prevent="submit">
     <AlertBanner v-if="serverError" :message="serverError" variant="error" @dismiss="serverError = ''" />
     <AlertBanner
+      v-if="entityId"
+      variant="info"
+      message="Correct the reading values and save. If this reading was approved, it returns to verified status and must be re-approved to regenerate utility charges."
+      :dismissible="false"
+    />
+    <AlertBanner
       v-if="consumptionWarning && !fieldError('current_reading')"
       :message="consumptionWarning"
       variant="warning"
     />
+    <AlertBanner
+      v-if="existingDuplicate && !entityId"
+      variant="warning"
+      :dismissible="false"
+    >
+      <span>{{ duplicateMessage }}</span>
+      <button
+        type="button"
+        class="ml-2 font-semibold underline hover:no-underline"
+        @click="emit('edit-existing', existingDuplicate.id)"
+      >
+        Edit existing reading
+      </button>
+    </AlertBanner>
 
     <FormSection
       compact
@@ -147,13 +167,21 @@ import { useBuildingPicker } from '@/composables/useBuildingPicker'
 import { useBuildingMeters } from '@/composables/useBuildingMeters'
 
 const props = defineProps({ entityId: { default: null } })
-const emit = defineEmits(['saved'])
+const emit = defineEmits(['saved', 'edit-existing'])
 
 const loading = ref(false)
 const selectedBuildingId = ref('')
 const meterContext = ref(null)
+const existingDuplicate = ref(null)
 const serverError = ref('')
 const fieldErrors = ref({})
+
+const duplicateMessage = computed(() => {
+  if (!existingDuplicate.value) return ''
+  const current = existingDuplicate.value.current_reading
+  const status = existingDuplicate.value.status_label || existingDuplicate.value.status
+  return `A reading for this meter on this date already exists (${current} · ${status}). Edit it or pick another date.`
+})
 
 const {
   buildings,
@@ -306,8 +334,43 @@ watch(
   () => form.meter_id,
   (id) => {
     loadMeterContext(id)
+    checkDuplicateReading()
   }
 )
+
+watch(
+  () => form.reading_date,
+  () => {
+    checkDuplicateReading()
+  }
+)
+
+async function checkDuplicateReading() {
+  existingDuplicate.value = null
+  if (props.entityId || !form.meter_id || !form.reading_date) {
+    return
+  }
+  try {
+    const { data } = await api.get('/meter-readings', {
+      params: {
+        meter_id: form.meter_id,
+        reading_date: form.reading_date,
+        per_page: 1,
+      },
+    })
+    const row = data.data?.[0]
+    if (row?.id) {
+      existingDuplicate.value = {
+        id: row.id,
+        current_reading: row.reading?.current_reading ?? row.current_reading,
+        status: row.status?.value ?? row.status,
+        status_label: row.status?.label,
+      }
+    }
+  } catch {
+    existingDuplicate.value = null
+  }
+}
 
 function validateClient() {
   const errors = {}
@@ -366,6 +429,15 @@ async function submit() {
     serverError.value = 'Please fix the highlighted fields.'
     return
   }
+  if (existingDuplicate.value && !props.entityId) {
+    fieldErrors.value = {
+      reading_date: [
+        'A reading for this meter already exists on this date. Edit the existing reading or choose a different date.',
+      ],
+    }
+    serverError.value = fieldErrors.value.reading_date[0]
+    return
+  }
   try {
     const payload = { ...form, current_reading: Number(form.current_reading) }
     if (props.entityId) {
@@ -383,6 +455,13 @@ async function submit() {
     }
   }
 }
+
+watch(
+  () => props.entityId,
+  async () => {
+    await load()
+  }
+)
 
 onMounted(async () => {
   await fetchBuildings()

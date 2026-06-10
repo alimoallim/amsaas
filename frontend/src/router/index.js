@@ -83,7 +83,29 @@ import ApartmentShow
 
 import TenantsIndex
   from '@/Pages/Tenants/TenantIndex.vue'
+import TenantBilling
+  from '@/Pages/Tenants/TenantBilling.vue'
 
+/*
+|--------------------------------------------------------------------------
+| Sales
+|--------------------------------------------------------------------------
+*/
+
+import BuyerIndex
+  from '@/Pages/Sales/BuyerIndex.vue'
+
+import InventoryIndex
+  from '@/Pages/Sales/InventoryIndex.vue'
+
+import SaleReservationsIndex
+  from '@/Pages/Sales/SaleReservationsIndex.vue'
+
+import SaleAgreementIndex
+  from '@/Pages/Sales/SaleAgreementIndex.vue'
+
+import SaleAgreementShow
+  from '@/Pages/Sales/SaleAgreementShow.vue'
 
 /*
 |--------------------------------------------------------------------------
@@ -114,6 +136,12 @@ import MeterShow
 import MeterReadingIndex
   from '@/Pages/MeterReading/MeterReadingIndex.vue'
 
+import MeterReadingBulkEntry
+  from '@/Pages/MeterReading/MeterReadingBulkEntry.vue'
+
+import MeterReadingApprovalQueue
+  from '@/Pages/MeterReading/MeterReadingApprovalQueue.vue'
+
 import MeterReadingShow
   from '@/Pages/MeterReading/MeterReadingShow.vue'
 
@@ -134,12 +162,26 @@ import InvoiceCreate
 
 import PaymentsIndex
   from '@/Pages/Payments/PaymentsIndex.vue'
+import PaymentShow
+  from '@/Pages/Payments/PaymentShow.vue'
 
 import ChargeApprovalGuide
   from '@/Pages/Charges/ChargeApprovalGuide.vue'
 
 import ChargeTypeIndex
   from '@/Pages/ChargeTypes/ChargeTypeIndex.vue'
+import AccountIndex
+  from '@/Pages/Accounting/AccountIndex.vue'
+import GeneralLedgerIndex
+  from '@/Pages/Accounting/GeneralLedgerIndex.vue'
+import TrialBalanceIndex
+  from '@/Pages/Accounting/TrialBalanceIndex.vue'
+import IncomeStatementIndex
+  from '@/Pages/Accounting/IncomeStatementIndex.vue'
+import BalanceSheetIndex
+  from '@/Pages/Accounting/BalanceSheetIndex.vue'
+import FinancialAuditIndex
+  from '@/Pages/Accounting/FinancialAuditIndex.vue'
 import ChargeModelIndex
   from '@/Pages/ChargeModels/ChargeModelIndex.vue'
 import ChargeModelShow
@@ -440,6 +482,86 @@ const routes = [
         },
       },
 
+      {
+        path: 'tenants/:id/billing',
+
+        name: 'TenantBilling',
+
+        component: TenantBilling,
+
+        props: true,
+
+        meta: {
+          title: 'Tenant billing',
+        },
+      },
+
+      /*
+      |--------------------------------------------------------------------------
+      | Sales
+      |--------------------------------------------------------------------------
+      */
+
+      {
+        path: 'sales/inventory',
+        name: 'SalesInventory',
+        component: InventoryIndex,
+        meta: { title: 'Sales inventory' },
+      },
+
+      {
+        path: 'sales/reservations',
+        name: 'SaleReservations',
+        component: SaleReservationsIndex,
+        meta: { title: 'Reservations' },
+      },
+
+      {
+        path: 'sales/contracts',
+        name: 'SaleAgreements',
+        component: SaleAgreementIndex,
+        meta: { title: 'Sale contracts' },
+      },
+
+      {
+        path: 'sales/contracts/:id',
+        name: 'SaleAgreementShow',
+        component: SaleAgreementShow,
+        props: true,
+        meta: { title: 'Sale contract' },
+      },
+
+      {
+        path: 'sales/buyers',
+        name: 'Buyers',
+        component: BuyerIndex,
+        meta: { title: 'Buyers' },
+      },
+
+      {
+        path: 'sales/buyers/create',
+        name: 'BuyerCreate',
+        component: FormRouteRedirect,
+        meta: {
+          title: 'Create buyer',
+          listRouteName: 'Buyers',
+          formMode: 'create',
+        },
+      },
+
+      {
+        path: 'sales/buyers/:id/edit',
+        name: 'BuyerEdit',
+        component: FormRouteRedirect,
+        props: true,
+        meta: {
+          title: 'Edit buyer',
+          listRouteName: 'Buyers',
+          formMode: 'edit',
+          formIdParam: 'id',
+        },
+      },
+
       /*
       |--------------------------------------------------------------------------
       | Rental Agreements
@@ -579,6 +701,30 @@ const routes = [
       },
 
       {
+        path: 'meter-readings/bulk-entry',
+
+        name: 'MeterReadingBulkEntry',
+
+        component: MeterReadingBulkEntry,
+
+        meta: {
+          title: 'Bulk Meter Readings',
+        },
+      },
+
+      {
+        path: 'meter-readings/queue',
+
+        name: 'MeterReadingApprovalQueue',
+
+        component: MeterReadingApprovalQueue,
+
+        meta: {
+          title: 'Reading Approval Queue',
+        },
+      },
+
+      {
         path: 'meter-readings/create',
 
         name: 'MeterReadingCreate',
@@ -626,6 +772,107 @@ const routes = [
       | Financials
       |--------------------------------------------------------------------------
       */
+
+      {
+        path: 'general-ledger',
+
+        name: 'GeneralLedger',
+
+        component: GeneralLedgerIndex,
+
+        meta: {
+          title: 'General Ledger',
+        },
+      },
+
+      {
+        path: 'trial-balance',
+
+        name: 'TrialBalance',
+
+        component: TrialBalanceIndex,
+
+        meta: {
+          title: 'Trial Balance',
+        },
+      },
+
+      {
+        path: 'income-statement',
+
+        name: 'IncomeStatement',
+
+        component: IncomeStatementIndex,
+
+        meta: {
+          title: 'Income Statement',
+        },
+      },
+
+      {
+        path: 'balance-sheet',
+
+        name: 'BalanceSheet',
+
+        component: BalanceSheetIndex,
+
+        meta: {
+          title: 'Balance Sheet',
+        },
+      },
+
+      {
+        path: 'financial-audit',
+
+        name: 'FinancialAudit',
+
+        component: FinancialAuditIndex,
+
+        meta: {
+          title: 'Financial Audit Log',
+        },
+      },
+
+      {
+        path: 'accounts',
+
+        name: 'Accounts',
+
+        component: AccountIndex,
+
+        meta: {
+          title: 'Chart of Accounts',
+        },
+      },
+      {
+        path: 'accounts/create',
+
+        name: 'AccountCreate',
+
+        component: FormRouteRedirect,
+
+        meta: {
+          title: 'Create Account',
+          listRouteName: 'Accounts',
+          formMode: 'create',
+        },
+      },
+      {
+        path: 'accounts/:id/edit',
+
+        name: 'AccountEdit',
+
+        component: FormRouteRedirect,
+
+        props: true,
+
+        meta: {
+          title: 'Edit Account',
+          listRouteName: 'Accounts',
+          formMode: 'edit',
+          formIdParam: 'id',
+        },
+      },
 
       {
         path: 'charge-types',
@@ -801,6 +1048,18 @@ const routes = [
 
         meta: {
           title: 'Payments',
+        },
+      },
+
+      {
+        path: 'payments/:id',
+
+        name: 'PaymentShow',
+
+        component: PaymentShow,
+
+        meta: {
+          title: 'Payment receipt',
         },
       },
 

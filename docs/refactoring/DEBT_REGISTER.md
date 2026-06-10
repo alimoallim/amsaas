@@ -60,7 +60,7 @@ Building, Apartment, Tenant, Agreement, User, MonthlyInvoice, InvoiceLineItem, P
 | H9 | Done | `TenantIsolationTest` does not prove HTTP isolation | `tests/Feature/Tenancy/*` | HTTP tests added |
 | H10 | Done | `CompanyScope` skips console — jobs unscoped | `CompanyScope.php`, `TenantContext.php` | Scope applies when `TenancyManager` / `tenant.current_id` set |
 | H11 | Done | Meter reading errors return 500 not 422 | `MeterReadingController.php`, `bootstrap/app.php` | API `ValidationException` → 422; store lets exceptions bubble |
-| H12 | Open | `MonthlyInvoiceResource` missing (if referenced) | Controllers/resources | Create or fix imports |
+| H12 | Done | `MonthlyInvoiceResource` missing (if referenced) | `MonthlyInvoiceResource.php` | Resource + controls implemented |
 | H13 | Done | `Building` duplicate scope (`BelongsToCompany` + custom `booted`) | `Building.php` | Removed duplicate booted scope |
 
 ---
@@ -79,7 +79,7 @@ Building, Apartment, Tenant, Agreement, User, MonthlyInvoice, InvoiceLineItem, P
 | M8 | Done | Charge Types UI not in router | `router/index.js`, nav |
 | M9 | Done | Charge Types UI uses `is_active`; API uses `status` | `ChargeTypeIndex.vue` |
 | M10 | Open | Orphan/stub pages | `MeterDetail.vue`, `InvoiceLayout.vue`, bulk invoice pages |
-| M11 | Open | Payments API commented; UI placeholder | `routes/api.php`, Payments pages |
+| M11 | Done | Payments API + UI operational | `PaymentController`, `PaymentsIndex.vue`, `PaymentShow.vue` |
 | M12 | Done | `EventServiceProvider` may be unregistered | `bootstrap/providers.php` |
 | M13 | Open | Formula charge strategy not implemented | `CalculateChargeService` |
 
@@ -115,3 +115,4 @@ Building, Apartment, Tenant, Agreement, User, MonthlyInvoice, InvoiceLineItem, P
 | 2026-06-03 | Sprint 0: C1–C6, H3, H7, H9, H13, M6–M9 marked Done |
 | 2026-06-03 | Phase 0: H10, H11 Done; M2 partial; tenancy tests for ChargeModel + MeterReading |
 | 2026-06-03 | Phase 0 CLOSED: M2 Done; PHPStan L6 + baseline; monthly_invoices migration; TenancySmokeTest |
+| 2026-06-03 | Phase 2 CLOSED: invoice engine + tenant billing; H12 Done; cron uses BillingPipelineService |

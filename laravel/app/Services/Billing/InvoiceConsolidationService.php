@@ -5,6 +5,7 @@ namespace App\Services\Billing;
 use App\Models\Agreement;
 use App\Models\BillingItem;
 use App\Models\Charge;
+use App\Models\ChargeModel;
 use App\Models\InvoiceLineItem;
 use App\Models\MonthlyInvoice;
 use App\Models\RentalAgreement;
@@ -84,7 +85,12 @@ class InvoiceConsolidationService
 
             foreach ($billingItems as $item) {
                 $lineTotal = Money::toScale((string) $item->total_amount, 2);
-                $rentSubtotal = Money::add($rentSubtotal, $lineTotal);
+                $bucket = $this->billingItemSubtotalBucket($item);
+                if ($bucket === 'services') {
+                    $servicesSubtotal = Money::add($servicesSubtotal, $lineTotal);
+                } else {
+                    $rentSubtotal = Money::add($rentSubtotal, $lineTotal);
+                }
             }
 
             foreach ($utilityCharges as $charge) {
@@ -138,9 +144,15 @@ class InvoiceConsolidationService
     ): ConsolidationResult {
         $rentAdd = Money::zero();
         $utilityAdd = Money::zero();
+        $servicesAdd = Money::zero();
 
         foreach ($billingItems as $item) {
-            $rentAdd = Money::add($rentAdd, Money::toScale((string) $item->total_amount, 2));
+            $lineTotal = Money::toScale((string) $item->total_amount, 2);
+            if ($this->billingItemSubtotalBucket($item) === 'services') {
+                $servicesAdd = Money::add($servicesAdd, $lineTotal);
+            } else {
+                $rentAdd = Money::add($rentAdd, $lineTotal);
+            }
         }
 
         foreach ($utilityCharges as $charge) {
@@ -154,6 +166,10 @@ class InvoiceConsolidationService
             ),
             'subtotal_utilities' => Money::toScale(
                 Money::add(Money::toScale((string) $invoice->subtotal_utilities, 2), $utilityAdd),
+                2
+            ),
+            'subtotal_services' => Money::toScale(
+                Money::add(Money::toScale((string) ($invoice->subtotal_services ?? 0), 2), $servicesAdd),
                 2
             ),
         ]);
@@ -199,6 +215,7 @@ class InvoiceConsolidationService
         $periodEnd = $billingDate->copy()->endOfMonth()->toDateString();
 
         return BillingItem::query()
+            ->with('chargeModel')
             ->where('company_id', $this->currentUser->company_id)
             ->where('agreement_id', $agreementId)
             ->where('posted_to_invoice', false)
@@ -268,7 +285,8 @@ class InvoiceConsolidationService
         foreach ($billingItems as $item) {
             InvoiceLineItem::create([
                 'monthly_invoice_id' => $invoice->id,
-                'line_type' => 'rent',
+                'charge_type_id' => $item->charge_type_id,
+                'line_type' => $this->billingItemLineType($item),
                 'description' => $item->description ?? 'Recurring contract charge',
                 'quantity' => $item->quantity ?? 1,
                 'unit_price' => $item->unit_rate ?? $item->subtotal_amount,
@@ -291,6 +309,7 @@ class InvoiceConsolidationService
         foreach ($utilityCharges as $charge) {
             InvoiceLineItem::create([
                 'monthly_invoice_id' => $invoice->id,
+                'charge_type_id' => $charge->charge_type_id,
                 'line_type' => $this->utilityLineType($charge),
                 'description' => $charge->description ?? 'Utility consumption charge',
                 'quantity' => $charge->quantity ?? 1,
@@ -318,6 +337,27 @@ class InvoiceConsolidationService
             Charge::CATEGORY_UTILITY => 'electricity',
             default => 'utility',
         };
+    }
+
+    protected function billingItemSubtotalBucket(BillingItem $item): string
+    {
+        $strategy = $item->relationLoaded('chargeModel')
+            ? $item->chargeModel?->pricing_strategy
+            : null;
+
+        if (in_array($strategy, [
+            ChargeModel::STRATEGY_FLAT_FEE,
+            ChargeModel::STRATEGY_FIXED,
+        ], true)) {
+            return 'services';
+        }
+
+        return 'rent';
+    }
+
+    protected function billingItemLineType(BillingItem $item): string
+    {
+        return $this->billingItemSubtotalBucket($item) === 'services' ? 'service' : 'rent';
     }
 
 }

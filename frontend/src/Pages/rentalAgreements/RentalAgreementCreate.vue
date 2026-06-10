@@ -31,6 +31,8 @@ const form = reactive({
   status: 'draft',
   rent_charge_model_id: '',
   recurring_charges: [],
+  notes: '',
+  special_terms: '',
 })
 
 async function loadDependencies() {
@@ -85,21 +87,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-      <div>
-        <p class="text-sm font-medium text-slate-500">Rental Agreements</p>
-        <h1 class="mt-1 text-3xl font-bold tracking-tight text-slate-900">Create Rental Agreement</h1>
-        <p class="mt-2 text-sm text-slate-500">
-          Configure legal, financial, and operational rental contract details.
-        </p>
+  <div class="space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="min-w-0">
+        <p class="text-xs font-medium text-slate-500">Rental Agreements</p>
+        <h1 class="text-xl font-bold tracking-tight text-slate-900">Create Rental Agreement</h1>
       </div>
       <button
         type="button"
-        class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+        class="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
         @click="cancelCreate"
       >
-        Back to Agreements
+        Back
       </button>
     </div>
 

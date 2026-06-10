@@ -25,7 +25,9 @@ trait LogsActivity
             'entity_type' => $model::class,
             'entity_id' => $model->getKey(),
             'old_values' => $action === 'created' ? null : $model->getOriginal(),
-            'new_values' => $action === 'deleted' ? null : $model->getChanges(),
+            'new_values' => $action === 'deleted'
+                ? null
+                : ($action === 'created' ? $model->getAttributes() : $model->getChanges()),
             'ip_address' => request()?->ip(),
             'user_agent' => request()?->userAgent(),
         ]);

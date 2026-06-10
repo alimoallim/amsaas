@@ -276,11 +276,46 @@ class BillingProcessorService
         ]);
     }
 
-    protected function getBillableCharges()
+    /**
+     * Generate pending billing items for one agreement's recurring charges in the
+     * processor billing period (idempotent per charge + period).
+     */
+    public function ensureBillingItemsForAgreement(string $agreementId): int
+    {
+        $this->billingRun = $this->createBillingRun();
+        $this->billingRun->update([
+            'status' => BillingRun::STATUS_RUNNING,
+            'execution_started_at' => now(),
+            'name' => 'Agreement charge resync',
+            'description' => 'Billing items after agreement charge update for '
+                .$this->billingDate->format('F Y'),
+        ]);
+
+        $created = 0;
+
+        foreach ($this->getBillableCharges($agreementId) as $charge) {
+            if ($this->billingItemExists($charge)) {
+                continue;
+            }
+
+            $this->processSingleChargeWithIsolation($charge);
+            $created++;
+        }
+
+        $this->billingRun->update([
+            'status' => 'completed',
+            'execution_completed_at' => now(),
+        ]);
+
+        return $created;
+    }
+
+    protected function getBillableCharges(?string $agreementId = null)
     {
         return AgreementCharge::query()
             ->with(['agreement', 'chargeModel', 'chargeType'])
             ->where('company_id', $this->user->company_id)
+            ->when($agreementId, fn ($query) => $query->where('agreement_id', $agreementId))
             ->where('status', 'active')
             ->where('is_suspended', false)
             ->whereHas(
@@ -296,7 +331,7 @@ class BillingProcessorService
                 $query->whereNull('billing_end_date')
                       ->orWhereDate('billing_end_date', '>=', $this->billingDate->toDateString());
             })
-            ->orderBy('priority', 'asc') // Evaluates essential dependencies first
+            ->orderBy('priority', 'asc')
             ->get();
     }
 

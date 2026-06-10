@@ -195,4 +195,42 @@ class PropertyManagementLifecycleTest extends TestCase
             'payment_due_day' => 1,
         ])->assertStatus(422);
     }
+
+    public function test_sale_apartment_requires_market_sale_price(): void
+    {
+        [$company] = $this->actingCompanyUser();
+        $building = Building::factory()->create(['company_id' => $company->id]);
+
+        $this->postJson('/api/v1/apartments', [
+            'building_id' => $building->id,
+            'unit_number' => 'S-101',
+            'property_type' => 'apartment',
+            'bedrooms' => 2,
+            'bathrooms' => 1,
+            'listing_type' => Apartment::LISTING_TYPE_SALE,
+            'inventory_status' => Apartment::STATUS_AVAILABLE,
+            'currency' => 'USD',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['market_sale_price']);
+    }
+
+    public function test_sale_apartment_creates_with_market_sale_price(): void
+    {
+        [$company] = $this->actingCompanyUser();
+        $building = Building::factory()->create(['company_id' => $company->id]);
+
+        $this->postJson('/api/v1/apartments', [
+            'building_id' => $building->id,
+            'unit_number' => 'S-102',
+            'property_type' => 'apartment',
+            'bedrooms' => 3,
+            'bathrooms' => 2,
+            'listing_type' => Apartment::LISTING_TYPE_SALE,
+            'inventory_status' => Apartment::STATUS_AVAILABLE,
+            'market_sale_price' => 185000,
+            'currency' => 'USD',
+        ])->assertCreated()
+            ->assertJsonPath('data.listing.listing_type', Apartment::LISTING_TYPE_SALE)
+            ->assertJsonPath('data.pricing.market_sale_price', fn ($v) => (float) $v === 185000.0);
+    }
 }

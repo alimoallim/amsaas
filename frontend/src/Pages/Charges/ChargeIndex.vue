@@ -22,6 +22,13 @@
     </template>
 
     <template #kpis>
+      <AlertBanner
+        v-if="error"
+        variant="error"
+        class="mb-4"
+        :message="error?.response?.data?.message || error?.message || 'Failed to load charges.'"
+        @dismiss="error = null"
+      />
       <KpiStrip class="grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Pending (company)" :value="companySummary.pending" variant="accent" />
         <KpiCard label="Ready to invoice" :value="companySummary.approved_ready" />
@@ -130,6 +137,7 @@ import {
   KpiCard,
   KpiStrip,
   ErpModal,
+  AlertBanner,
 } from '@/components/erp'
 
 const route = useRoute()
@@ -141,6 +149,7 @@ const acting = ref(null)
 const {
   items,
   loading,
+  error,
   meta,
   summary,
   companySummary,
@@ -154,7 +163,7 @@ const {
 } = useCharges()
 
 const { filters: smartFilters, chips, clearAll, removeChip, bindRoute } = useSmartFilters({
-  defaults: { search: '', status: 'pending', category: 'utility' },
+  defaults: { search: '', status: '', category: 'utility' },
   labels: {
     search: { label: 'Search' },
     status: { label: 'Status' },
