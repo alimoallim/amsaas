@@ -20,7 +20,7 @@ class ChargeModelVersionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_store_rejects_formula_pricing_strategy(): void
+    public function test_store_accepts_formula_pricing_strategy(): void
     {
         $company = Company::factory()->create();
         $user = User::factory()->create(['company_id' => $company->id]);
@@ -44,8 +44,7 @@ class ChargeModelVersionTest extends TestCase
             'auto_generate' => true,
             'requires_approval' => false,
         ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['pricing_strategy']);
+            ->assertCreated();
     }
 
     public function test_update_active_in_use_model_creates_new_version(): void

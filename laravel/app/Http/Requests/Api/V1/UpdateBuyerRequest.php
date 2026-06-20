@@ -9,7 +9,7 @@ class UpdateBuyerRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user() !== null;
     }
 
     protected function prepareForValidation(): void

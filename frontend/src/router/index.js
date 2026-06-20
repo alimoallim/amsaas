@@ -207,6 +207,9 @@ import ReportsIndex
 import SettingsIndex
   from '@/Pages/Settings/SettingsIndex.vue'
 
+import ReminderScheduleSettings
+  from '@/Pages/Settings/ReminderScheduleSettings.vue'
+
 import FormRouteRedirect
   from '@/components/forms/FormRouteRedirect.vue'
 
@@ -1096,6 +1099,18 @@ const routes = [
 
         meta: {
           title: 'Settings',
+        },
+      },
+
+      {
+        path: 'settings/reminder-schedule',
+
+        name: 'ReminderScheduleSettings',
+
+        component: ReminderScheduleSettings,
+
+        meta: {
+          title: 'Reminder Schedule Settings',
         },
       },
     ],

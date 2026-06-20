@@ -157,6 +157,11 @@ Route::prefix('v1')->group(function () {
             ->name('api.v1.payments.reverse');
         Route::apiResource('payments', PaymentController::class)->only(['index', 'store', 'show']);
 
+        Route::get('settings/reminder-schedule', [ReportsController::class, 'getReminderSchedule'])
+            ->name('api.v1.settings.reminder-schedule.show');
+        Route::put('settings/reminder-schedule', [ReportsController::class, 'updateReminderSchedule'])
+            ->name('api.v1.settings.reminder-schedule.update');
+
         Route::prefix('reports')->group(function () {
             Route::get('aging', [ReportsController::class, 'aging'])
                 ->name('api.v1.reports.aging');

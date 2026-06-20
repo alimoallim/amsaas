@@ -164,6 +164,12 @@ class CollectionReminderService
                 'sent_at' => now(),
                 'error_message' => null,
             ]);
+
+            $phone = trim((string) ($tenant?->phone ?? ''));
+            if ($phone !== '') {
+                $smsMessage = "Dear {$tenantName}, you have an outstanding invoice balance. Please contact us. - AMSAAS";
+                app(SmsGatewayService::class)->send($phone, $smsMessage);
+            }
         } catch (\Throwable $e) {
             $log->update([
                 'status' => 'failed',

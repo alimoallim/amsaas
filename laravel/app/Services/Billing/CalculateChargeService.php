@@ -174,7 +174,8 @@ class CalculateChargeService
         }
 
         $tokens = $this->tokenize($expression, $variables);
-        return $this->parseExpression($tokens);
+        $pos = 0;
+        return $this->parseExpression($tokens, $pos);
     }
 
     private function tokenize(string $expression, array $variables): array
@@ -200,7 +201,7 @@ class CalculateChargeService
         return $tokens;
     }
 
-    private function parseExpression(array &$tokens, int &$pos = 0): string
+    private function parseExpression(array &$tokens, int &$pos): string
     {
         $left = $this->parseTerm($tokens, $pos);
 

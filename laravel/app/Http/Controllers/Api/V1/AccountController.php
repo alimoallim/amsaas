@@ -150,6 +150,34 @@ class AccountController extends Controller
         ]);
     }
 
+    public function reverseJournalEntry(Request $request, \App\Models\JournalEntry $journalEntry, \App\Services\Accounting\JournalEntryService $journalEntryService): JsonResponse
+    {
+        abort_unless($journalEntry->company_id === $request->user()->company_id, 404);
+
+        $validated = $request->validate([
+            'description' => 'nullable|string|max:500',
+        ]);
+
+        if ($journalEntry->reversed_at !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This journal entry has already been reversed.',
+            ], 422);
+        }
+
+        $reversal = $journalEntryService->reverseEntry(
+            $journalEntry,
+            $request->user()->id,
+            $validated['description'] ?? null,
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Journal entry reversed successfully.',
+            'data' => $reversal->load('lines.account'),
+        ]);
+    }
+
     public function destroy(Account $account): Response|JsonResponse
     {
         $this->authorize('delete', $account);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\SendCollectionReminderRequest;
 use App\Models\CollectionNotice;
+use App\Models\CompanyReminderSchedule;
 use App\Models\DelinquencyFlag;
 use App\Services\Collections\AgingReceivablesService;
 use App\Services\Collections\CollectionNoticePdfService;
@@ -208,6 +209,50 @@ class ReportsController extends Controller
             fclose($handle);
         }, $filename, [
             'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    public function getReminderSchedule(Request $request): JsonResponse
+    {
+        $companyId = (string) $request->user()->company_id;
+        $schedule = CompanyReminderSchedule::query()
+            ->where('company_id', $companyId)
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'data' => $schedule ?? [
+                'company_id'      => $companyId,
+                'days_before_due' => [],
+                'days_after_due'  => [1, 7, 14, 30],
+                'channels'        => ['email'],
+                'is_active'       => true,
+            ],
+        ]);
+    }
+
+    public function updateReminderSchedule(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'days_before_due'   => 'nullable|array',
+            'days_before_due.*' => 'integer|min:0|max:365',
+            'days_after_due'    => 'nullable|array',
+            'days_after_due.*'  => 'integer|min:0|max:365',
+            'channels'          => 'nullable|array',
+            'channels.*'        => 'string|in:email,sms',
+            'is_active'         => 'boolean',
+        ]);
+
+        $companyId = (string) $request->user()->company_id;
+
+        $schedule = CompanyReminderSchedule::query()->updateOrCreate(
+            ['company_id' => $companyId],
+            array_merge(['company_id' => $companyId], $validated),
+        );
+
+        return response()->json([
+            'success' => true,
+            'data'    => $schedule,
         ]);
     }
 }
