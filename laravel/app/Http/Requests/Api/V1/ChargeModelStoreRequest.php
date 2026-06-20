@@ -204,13 +204,6 @@ class ChargeModelStoreRequest extends FormRequest
 
                 $strategy = $this->pricing_strategy;
 
-                if ($strategy === ChargeModel::STRATEGY_FORMULA) {
-                    $validator->errors()->add(
-                        'pricing_strategy',
-                        'Formula pricing is not available yet. Choose fixed, metered, tiered, or percentage.'
-                    );
-                }
-
                 if (
                     $strategy ===
                     ChargeModel::STRATEGY_METERED

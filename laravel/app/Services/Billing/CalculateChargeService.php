@@ -147,7 +147,123 @@ class CalculateChargeService
 
     protected function calculateFormula(ChargeModel $chargeModel, array $context): string
     {
-        throw new ChargeCalculationException('Formula engine not implemented yet.');
+        $expression = trim((string) ($chargeModel->formula_expression ?? ''));
+
+        if ($expression === '') {
+            throw new ChargeCalculationException('Formula expression is empty.');
+        }
+
+        $variables = [
+            'consumption'     => (string) ($context['consumption'] ?? '0'),
+            'base_amount'     => (string) ($context['base_amount'] ?? $chargeModel->base_amount ?? '0'),
+            'monthly_rent'    => (string) ($context['monthly_rent'] ?? '0'),
+            'override_amount' => (string) ($context['override_amount'] ?? '0'),
+            'unit_rate'       => (string) ($chargeModel->unit_rate ?? $context['unit_rate'] ?? '0'),
+            'flat_amount'     => (string) ($context['flat_amount'] ?? '0'),
+            'percentage_rate' => (string) ($chargeModel->percentage_rate ?? '0'),
+        ];
+
+        return Money::toScale($this->evaluateFormula($expression, $variables), 2);
+    }
+
+    private function evaluateFormula(string $expression, array $variables): string
+    {
+        $allowed = '/^[0-9a-z_\s\+\-\*\/\(\)\.\,]+$/i';
+        if (! preg_match($allowed, $expression)) {
+            throw new ChargeCalculationException('Formula contains invalid characters.');
+        }
+
+        $tokens = $this->tokenize($expression, $variables);
+        return $this->parseExpression($tokens);
+    }
+
+    private function tokenize(string $expression, array $variables): array
+    {
+        $pattern = '/(\d+(?:\.\d+)?|[a-z_][a-z0-9_]*|[\+\-\*\/\(\)])/i';
+        preg_match_all($pattern, $expression, $matches);
+        $raw = $matches[0];
+
+        $tokens = [];
+        foreach ($raw as $token) {
+            if (preg_match('/^[a-z_]/i', $token)) {
+                if (! array_key_exists($token, $variables)) {
+                    throw new ChargeCalculationException("Unknown variable '{$token}' in formula.");
+                }
+                $tokens[] = ['type' => 'number', 'value' => $variables[$token]];
+            } elseif (preg_match('/^\d/', $token)) {
+                $tokens[] = ['type' => 'number', 'value' => $token];
+            } else {
+                $tokens[] = ['type' => 'op', 'value' => $token];
+            }
+        }
+
+        return $tokens;
+    }
+
+    private function parseExpression(array &$tokens, int &$pos = 0): string
+    {
+        $left = $this->parseTerm($tokens, $pos);
+
+        while (isset($tokens[$pos]) && in_array($tokens[$pos]['value'], ['+', '-'])) {
+            $op = $tokens[$pos]['value'];
+            $pos++;
+            $right = $this->parseTerm($tokens, $pos);
+            $left = $op === '+' ? Money::add($left, $right) : Money::sub($left, $right);
+        }
+
+        return $left;
+    }
+
+    private function parseTerm(array &$tokens, int &$pos): string
+    {
+        $left = $this->parseFactor($tokens, $pos);
+
+        while (isset($tokens[$pos]) && in_array($tokens[$pos]['value'], ['*', '/'])) {
+            $op = $tokens[$pos]['value'];
+            $pos++;
+            $right = $this->parseFactor($tokens, $pos);
+            if ($op === '/') {
+                if (bccomp($right, '0', Money::SCALE) === 0) {
+                    throw new ChargeCalculationException('Division by zero in formula.');
+                }
+                $left = Money::div($left, $right);
+            } else {
+                $left = Money::mul($left, $right);
+            }
+        }
+
+        return $left;
+    }
+
+    private function parseFactor(array &$tokens, int &$pos): string
+    {
+        if (! isset($tokens[$pos])) {
+            throw new ChargeCalculationException('Unexpected end of formula expression.');
+        }
+
+        $token = $tokens[$pos];
+
+        if ($token['type'] === 'op' && $token['value'] === '(') {
+            $pos++;
+            $value = $this->parseExpression($tokens, $pos);
+            if (! isset($tokens[$pos]) || $tokens[$pos]['value'] !== ')') {
+                throw new ChargeCalculationException('Mismatched parentheses in formula.');
+            }
+            $pos++;
+            return $value;
+        }
+
+        if ($token['type'] === 'op' && $token['value'] === '-') {
+            $pos++;
+            return Money::sub('0', $this->parseFactor($tokens, $pos));
+        }
+
+        if ($token['type'] === 'number') {
+            $pos++;
+            return Money::toScale($token['value']);
+        }
+
+        throw new ChargeCalculationException("Unexpected token '{$token['value']}' in formula.");
     }
 
     protected function applyLimits(string $amount, ChargeModel $chargeModel): string

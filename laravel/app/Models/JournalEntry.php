@@ -37,6 +37,8 @@ class JournalEntry extends Model
         'total_credit',
         'status',
         'created_by',
+        'reversed_at',
+        'reversal_entry_id',
     ];
 
     protected $casts = [
@@ -46,6 +48,7 @@ class JournalEntry extends Model
         'fiscal_month' => 'integer',
         'total_debit' => 'decimal:4',
         'total_credit' => 'decimal:4',
+        'reversed_at' => 'datetime',
     ];
 
     public const STATUS_POSTED = 'posted';

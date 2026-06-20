@@ -75,6 +75,23 @@ class InvoiceService
         }
     }
 
+    public function undoPayment(MonthlyInvoice $invoice, float $amount): void
+    {
+        $invoice->refresh();
+        $newPaidAmount = round(max(0, (float) $invoice->paid_amount - $amount), 2);
+        $invoice->update(['paid_amount' => $newPaidAmount]);
+        $invoice->refresh();
+
+        $totalAmount = (float) $invoice->total_amount;
+        $paid = (float) $invoice->paid_amount;
+
+        if ($paid <= 0.009) {
+            $invoice->update(['status' => 'issued']);
+        } elseif ($paid < $totalAmount - 0.009) {
+            $invoice->update(['status' => 'partially_paid']);
+        }
+    }
+
     protected function reapplyTenantCredits(MonthlyInvoice $invoice): void
     {
         if ($invoice->contract_type !== 'rental') {

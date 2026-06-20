@@ -415,6 +415,92 @@ class JournalEntryService
         );
     }
 
+    public function postPaymentReversal(Payment $payment, string $reason, ?string $userId = null): ?JournalEntry
+    {
+        $payment->loadMissing(['allocations', 'company']);
+
+        $amount = Money::toScale((string) $payment->amount);
+
+        if (Money::comp($amount, '0') <= 0) {
+            return null;
+        }
+
+        $entryDate = now()->toDateString();
+
+        return $this->postBalancedEntry(
+            companyId: $payment->company_id,
+            description: 'Payment reversal — '.$payment->receipt_number.' — '.$reason,
+            entryDate: $entryDate,
+            postingDate: $entryDate,
+            sourceType: 'payment_reversal',
+            sourceId: $payment->id,
+            fiscalYear: (int) now()->format('Y'),
+            fiscalMonth: (int) now()->format('n'),
+            currencyCode: $payment->company?->currency_code ?? 'USD',
+            debitLines: [[
+                'account_code' => $this->postingRules->accountsReceivableCode(),
+                'debit' => $amount,
+                'description' => 'AR reinstated — '.$payment->receipt_number,
+            ]],
+            creditLines: [[
+                'account_code' => $this->postingRules->resolveReceiptAccountCode($payment),
+                'credit' => $amount,
+                'description' => 'Payment reversed — '.$payment->receipt_number,
+            ]],
+            userId: $userId,
+        );
+    }
+
+    public function reverseEntry(JournalEntry $entry, ?string $userId = null, ?string $description = null): JournalEntry
+    {
+        $entry->loadMissing('lines.account');
+
+        $desc = $description ?? 'Reversal of: '.$entry->description;
+
+        $debitLines = [];
+        $creditLines = [];
+
+        foreach ($entry->lines as $line) {
+            $debit = Money::toScale((string) $line->debit_amount);
+            $credit = Money::toScale((string) $line->credit_amount);
+
+            if (Money::comp($debit, '0') > 0) {
+                $creditLines[] = [
+                    'account_code' => $line->account->code,
+                    'credit' => $debit,
+                    'description' => $line->description,
+                ];
+            }
+
+            if (Money::comp($credit, '0') > 0) {
+                $debitLines[] = [
+                    'account_code' => $line->account->code,
+                    'debit' => $credit,
+                    'description' => $line->description,
+                ];
+            }
+        }
+
+        $reversal = $this->postBalancedEntry(
+            companyId: $entry->company_id,
+            description: $desc,
+            entryDate: now()->toDateString(),
+            postingDate: now()->toDateString(),
+            sourceType: 'reversal',
+            sourceId: $entry->id,
+            fiscalYear: (int) now()->format('Y'),
+            fiscalMonth: (int) now()->format('n'),
+            currencyCode: $entry->currency_code ?? 'USD',
+            debitLines: $debitLines,
+            creditLines: $creditLines,
+            userId: $userId,
+        );
+
+        $entry->update(['reversed_at' => now(), 'reversal_entry_id' => $reversal->id]);
+
+        return $reversal;
+    }
+
     /**
      * @return Collection<int, JournalEntry>
      */

@@ -55,7 +55,7 @@ Route::prefix('v1')->group(function () {
     | Third-Party Webhooks (Exempt from Sanctum Auth)
     |--------------------------------------------------------------------------
     */
-    // Route::post('webhooks/payments/evc-plus', [PaymentWebhookController::class, 'handleEvcPlus']);
+    Route::post('webhooks/payments/evc-plus', [PaymentWebhookController::class, 'handleEvcPlus']);
 
     /*
     |--------------------------------------------------------------------------
@@ -102,6 +102,8 @@ Route::prefix('v1')->group(function () {
             ->name('api.v1.financial-audit.export');
         Route::get('financial-audit', [FinancialAuditController::class, 'index'])
             ->name('api.v1.financial-audit.index');
+        Route::post('journal-entries/{journalEntry}/reverse', [AccountController::class, 'reverseJournalEntry'])
+            ->name('api.v1.journal-entries.reverse');
         Route::apiResource('accounts', AccountController::class);
         Route::apiResource('charge-types', ChargeTypeController::class);
         Route::post('charge-models/{charge_model}/clone', [ChargeModelController::class, 'clone'])
@@ -151,6 +153,8 @@ Route::prefix('v1')->group(function () {
         Route::get('payments/receipt-account-options', [PaymentController::class, 'receiptAccountOptions']);
         Route::get('payments/tenant-balance', [PaymentController::class, 'tenantBalance'])
             ->name('api.v1.payments.tenant-balance');
+        Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])
+            ->name('api.v1.payments.reverse');
         Route::apiResource('payments', PaymentController::class)->only(['index', 'store', 'show']);
 
         Route::prefix('reports')->group(function () {

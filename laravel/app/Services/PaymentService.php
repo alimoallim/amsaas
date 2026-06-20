@@ -168,6 +168,40 @@ class PaymentService
         );
     }
 
+    public function reversePayment(User $user, Payment $payment, string $reason): Payment
+    {
+        abort_unless($payment->company_id === $user->company_id, 403, 'Payment does not belong to your company.');
+
+        if ($payment->status !== 'completed') {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'status' => ['Only completed payments can be reversed.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($user, $payment, $reason) {
+            $payment->loadMissing('allocations.monthlyInvoice');
+
+            foreach ($payment->allocations as $allocation) {
+                $invoice = $allocation->monthlyInvoice;
+                if ($invoice) {
+                    $this->invoiceService->undoPayment($invoice, (float) $allocation->amount_allocated);
+                }
+                $allocation->delete();
+            }
+
+            app(JournalEntryService::class)->postPaymentReversal($payment, $reason, $user->id);
+
+            $notes = trim(($payment->notes ? $payment->notes."\n" : '').'Reversal reason: '.$reason);
+            $payment->update([
+                'status' => 'reversed',
+                'notes' => $notes,
+                'reversed_at' => now(),
+            ]);
+
+            return $payment->fresh(['allocations', 'tenant']);
+        });
+    }
+
     protected function allocateToOpenInvoices(
         string $companyId,
         string $tenantId,

@@ -100,6 +100,21 @@ class PaymentController extends Controller
         ]);
     }
 
+    public function reverse(Request $request, Payment $payment, PaymentService $payments): JsonResponse
+    {
+        $validated = $request->validate([
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        $reversed = $payments->reversePayment($request->user(), $payment, $validated['reason']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment reversed successfully.',
+            'data' => new PaymentResource($reversed),
+        ]);
+    }
+
     public function store(RecordPaymentRequest $request, PaymentService $payments): JsonResponse
     {
         $payment = $payments->recordPayment(
