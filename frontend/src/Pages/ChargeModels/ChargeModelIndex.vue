@@ -6,7 +6,7 @@
     description="Pricing rules for utilities, rent components, and recurring fees."
   >
     <template #actions>
-      <ErpButton @click="formModal.openCreate()">Add charge model</ErpButton>
+      <ErpButton :to="{ name: 'ChargeModelCreate' }">Add charge model</ErpButton>
     </template>
 
     <template #filters>
@@ -49,7 +49,7 @@
         @row-click="(row) => $router.push({ name: 'ChargeModelShow', params: { id: row.id } })"
       >
         <template #emptyAction>
-          <ErpButton @click="formModal.openCreate()">Create charge model</ErpButton>
+          <ErpButton :to="{ name: 'ChargeModelCreate' }">Create charge model</ErpButton>
         </template>
         <template #cell-pricing_strategy="{ row }">
           <span class="text-sm text-slate-700">{{ pricingPolicyLabel(row.pricing_strategy) }}</span>
@@ -70,12 +70,6 @@
     </template>
   </WorklistLayout>
 
-  <ChargeModelFormModal
-    :open="formModal.state.open"
-    :entity-id="formModal.state.id"
-    @close="formModal.close()"
-    @saved="onSaved"
-  />
 </template>
 
 <script setup>
@@ -83,11 +77,9 @@ import { computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useChargeModels } from '@/composables/useChargeModels'
 import { useSmartFilters } from '@/composables/useSmartFilters'
-import { useFormModal } from '@/composables/useFormModal'
 import { pricingPolicyLabel } from '@/utils/chargeModelForm'
 import api from '@/services/api'
 import { compactActions, viewAction, editAction } from '@/composables/useTableActions'
-import ChargeModelFormModal from '@/components/forms/ChargeModelFormModal.vue'
 import {
   WorklistLayout,
   SmartFilterBar,
@@ -100,7 +92,6 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const formModal = useFormModal()
 const { items: rows, loading, meta, filters, fetchList: fetchRows, resetFilters } = useChargeModels()
 
 const { filters: smartFilters, chips, clearAll, removeChip, bindRoute } = useSmartFilters({
@@ -132,7 +123,7 @@ async function cloneModel(row) {
 function chargeModelActions(row) {
   return compactActions([
     viewAction('ChargeModelShow', row.id),
-    row.controls?.can_edit !== false && editAction(() => formModal.openEdit(row.id)),
+    row.controls?.can_edit !== false && editAction(() => router.push({ name: 'ChargeModelEdit', params: { id: row.id } })),
     row.controls?.can_clone !== false && {
       key: 'clone',
       label: 'Clone',
@@ -160,13 +151,8 @@ function onClearAll() {
   syncAndFetch()
 }
 
-async function onSaved() {
-  await fetchRows(meta.value.current_page)
-}
-
 onMounted(() => {
   bindRoute(route, router, { debounceMs: 300 })
-  formModal.syncFromRoute(route, router)
   fetchRows()
 })
 </script>

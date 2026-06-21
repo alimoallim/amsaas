@@ -10,7 +10,10 @@ class UpdateChargeTypeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $chargeType = $this->route('charge_type');
+
+        return $chargeType instanceof ChargeType
+            && ($this->user()?->can('update', $chargeType) ?? false);
     }
 
     public function rules(): array

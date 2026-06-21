@@ -71,8 +71,6 @@ const form = reactive({
 
   rent_charge_model_id: '',
   recurring_charges: [],
-  notes: '',
-  special_terms: '',
 })
 
 /*
@@ -140,8 +138,6 @@ async function loadAgreement() {
     form.rent_charge_model_id = billing.rent_charge_model_id
     form.recurring_charges = billing.recurring_charges
 
-    form.notes = data?.notes?.agreement_notes ?? ''
-    form.special_terms = data?.notes?.special_terms ?? ''
 
   } catch (error) {
 

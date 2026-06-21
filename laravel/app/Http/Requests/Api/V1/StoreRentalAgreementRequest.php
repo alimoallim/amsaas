@@ -5,6 +5,7 @@ namespace App\Http\Requests\Api\V1;
 use App\Http\Requests\Api\V1\Concerns\ValidatesAgreementBilling;
 use App\Models\Agreement;
 use App\Models\Apartment;
+use App\Models\RentalAgreement;
 use App\Models\Tenant;
 use App\Services\Property\ApartmentInventoryService;
 
@@ -22,7 +23,7 @@ class StoreRentalAgreementRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return auth()->check();
+        return $this->user()?->can('create', RentalAgreement::class) ?? false;
     }
 
     /*
@@ -184,18 +185,6 @@ class StoreRentalAgreementRequest extends FormRequest
                 'file',
                 'mimes:pdf',
                 'max:10240',
-            ],
-
-            'special_terms' => [
-                'nullable',
-                'string',
-            ],
-
-            'notes' => [
-
-                'nullable',
-
-                'string',
             ],
 
             'status' => [

@@ -7,7 +7,7 @@
   >
     <template #actions>
       <ErpButton variant="ghost" size="sm" :loading="loading" @click="fetchList(meta.current_page)">Refresh</ErpButton>
-      <ErpButton @click="formModal.openCreate()">Register meter</ErpButton>
+      <ErpButton :to="{ name: 'MeterCreate' }">Register meter</ErpButton>
     </template>
 
     <template #kpis>
@@ -58,7 +58,7 @@
         @row-click="(row) => $router.push({ name: 'MeterShow', params: { id: row.id } })"
       >
         <template #emptyAction>
-          <ErpButton @click="formModal.openCreate()">Register meter</ErpButton>
+          <ErpButton :to="{ name: 'MeterCreate' }">Register meter</ErpButton>
         </template>
         <template #cell-meter="{ row }">
           <div>
@@ -92,12 +92,6 @@
     </template>
   </WorklistLayout>
 
-  <MeterFormModal
-    :open="formModal.state.open"
-    :entity-id="formModal.state.id"
-    @close="formModal.close()"
-    @saved="onSaved"
-  />
 </template>
 
 <script setup>
@@ -105,9 +99,7 @@ import { watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMeters } from '@/composables/useMeters'
 import { useSmartFilters } from '@/composables/useSmartFilters'
-import { useFormModal } from '@/composables/useFormModal'
 import { compactActions, viewAction, editAction } from '@/composables/useTableActions'
-import MeterFormModal from '@/components/forms/MeterFormModal.vue'
 import {
   WorklistLayout,
   SmartFilterBar,
@@ -122,7 +114,6 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const formModal = useFormModal()
 const { items, summary, loading, meta, filters, fetchList, resetFilters } = useMeters()
 
 const { filters: smartFilters, chips, clearAll, removeChip, bindRoute } = useSmartFilters({
@@ -145,7 +136,7 @@ const columns = [
 function meterActions(row) {
   return compactActions([
     viewAction('MeterShow', row.id),
-    editAction(() => formModal.openEdit(row.id)),
+    editAction(() => router.push({ name: 'MeterEdit', params: { id: row.id } })),
   ])
 }
 
@@ -168,13 +159,8 @@ function formatReading(val) {
   return Number(val).toLocaleString(undefined, { maximumFractionDigits: 4 })
 }
 
-async function onSaved() {
-  await fetchList(meta.value.current_page)
-}
-
 onMounted(() => {
   bindRoute(route, router, { debounceMs: 300 })
-  formModal.syncFromRoute(route, router)
   fetchList()
 })
 </script>

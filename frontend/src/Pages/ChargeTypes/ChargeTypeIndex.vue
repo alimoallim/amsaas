@@ -6,7 +6,7 @@
     description="Define billing categories, utility codes, and ledger mappings used across agreements and invoices."
   >
     <template #actions>
-      <ErpButton @click="formModal.openCreate()">Add charge type</ErpButton>
+      <ErpButton :to="{ name: 'ChargeTypeCreate' }">Add charge type</ErpButton>
     </template>
 
     <template #filters>
@@ -58,7 +58,7 @@
         @row-click="onRowClick"
       >
         <template #emptyAction>
-          <ErpButton @click="formModal.openCreate()">Add charge type</ErpButton>
+          <ErpButton :to="{ name: 'ChargeTypeCreate' }">Add charge type</ErpButton>
         </template>
 
         <template #cell-name="{ row }">
@@ -113,12 +113,6 @@
     @confirm="confirmStatusChange"
   />
 
-  <ChargeTypeFormModal
-    :open="formModal.state.open"
-    :entity-id="formModal.state.id"
-    @close="formModal.close()"
-    @saved="fetchChargeTypes(meta?.current_page || 1)"
-  />
 </template>
 
 <script setup>
@@ -126,9 +120,7 @@ import { reactive, ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useChargeTypes } from '@/composables/useChargeTypes'
 import { useSmartFilters } from '@/composables/useSmartFilters'
-import { useFormModal } from '@/composables/useFormModal'
 import { compactActions, editAction } from '@/composables/useTableActions'
-import ChargeTypeFormModal from '@/components/forms/ChargeTypeFormModal.vue'
 import {
   WorklistLayout,
   ErpButton,
@@ -143,7 +135,6 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const formModal = useFormModal()
 const serverError = ref('')
 
 const {
@@ -189,7 +180,7 @@ const columns = [
 function chargeTypeActions(row) {
   const active = isChargeTypeActive(row)
   return compactActions([
-    row.controls?.can_edit !== false && editAction(() => formModal.openEdit(row.id)),
+    row.controls?.can_edit !== false && editAction(() => router.push({ name: 'ChargeTypeEdit', params: { id: row.id } })),
     {
       key: 'toggle-status',
       label: active ? 'Deactivate' : 'Activate',
@@ -214,7 +205,7 @@ let searchDebounceTimer = null
 
 function onRowClick(row) {
   if (row.controls?.can_edit !== false) {
-    formModal.openEdit(row.id)
+    router.push({ name: 'ChargeTypeEdit', params: { id: row.id } })
   }
 }
 
@@ -277,7 +268,6 @@ function formatCategory(category) {
 
 onMounted(() => {
   bindRoute(route, router, { debounceMs: 300 })
-  formModal.syncFromRoute(route, router)
   fetchChargeTypes()
 })
 </script>

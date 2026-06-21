@@ -1,93 +1,39 @@
 <template>
-    <div
-        class="
-            grid
-            grid-cols-1
-            md:grid-cols-2
-            xl:grid-cols-5
-            gap-5
-            mb-8
-        "
-    >
-        <div
-            v-for="card in cards"
-            :key="card.label"
-            class="
-                rounded-2xl
-                bg-white
-                dark:bg-slate-900
-                border
-                border-slate-200
-                dark:border-slate-800
-                p-5
-                shadow-sm
-            "
-        >
-            <p
-                class="
-                    text-sm
-                    text-slate-500
-                "
-            >
-                {{ card.label }}
-            </p>
-
-            <h3
-                class="
-                    mt-3
-                    text-2xl
-                    font-bold
-                    text-emerald-600
-                "
-            >
-                {{ card.value }}
-            </h3>
-        </div>
-    </div>
+  <DashboardMetricGrid :items="cards" :columns="5" value-tone="money" />
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import DashboardMetricGrid from './DashboardMetricGrid.vue'
 
 const props = defineProps({
-    financials: Object
+  financials: { type: Object, default: () => ({}) },
+  formatMoney: { type: Function, default: null },
+  formatPercent: { type: Function, default: null },
 })
 
+function money(value) {
+  if (props.formatMoney) return props.formatMoney(value)
+  if (value == null) return '$0'
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(value))
+}
+
+function percent(value) {
+  if (props.formatPercent) return props.formatPercent(value)
+  if (value == null) return '0%'
+  return `${Number(value)}%`
+}
+
 const cards = computed(() => [
-
-    {
-        label: 'Rent Revenue',
-        value:
-            props.financials
-                ?.rent_revenue || '$0'
-    },
-
-    {
-        label: 'Utility Revenue',
-        value:
-            props.financials
-                ?.utility_revenue || '$0'
-    },
-
-    {
-        label: 'Collected',
-        value:
-            props.financials
-                ?.collected || '$0'
-    },
-
-    {
-        label: 'Outstanding',
-        value:
-            props.financials
-                ?.outstanding || '$0'
-    },
-
-    {
-        label: 'Collection Rate',
-        value:
-            props.financials
-                ?.collection_rate || '0%'
-    }
+  { key: 'rent_revenue', label: 'Rent revenue', value: money(props.financials?.rent_revenue) },
+  { key: 'utility_revenue', label: 'Utility revenue', value: money(props.financials?.utility_revenue) },
+  { key: 'collected', label: 'Collected', value: money(props.financials?.collected), tone: 'positive' },
+  { key: 'outstanding', label: 'Outstanding', value: money(props.financials?.outstanding) },
+  {
+    key: 'collection_rate',
+    label: 'Collection rate',
+    value: percent(props.financials?.collection_rate),
+    tone: 'accent',
+  },
 ])
 </script>

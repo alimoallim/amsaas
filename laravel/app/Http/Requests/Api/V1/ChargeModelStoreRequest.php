@@ -11,7 +11,13 @@ class ChargeModelStoreRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $chargeModel = $this->route('charge_model');
+
+        if ($chargeModel instanceof ChargeModel) {
+            return $this->user()?->can('update', $chargeModel) ?? false;
+        }
+
+        return $this->user()?->can('create', ChargeModel::class) ?? false;
     }
 
     public function rules(): array

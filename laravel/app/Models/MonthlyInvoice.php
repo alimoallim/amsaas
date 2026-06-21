@@ -37,6 +37,7 @@ class MonthlyInvoice extends Model
         'balance_due' => 'decimal:4',
         'finalized_at' => 'datetime',
         'voided_at' => 'datetime',
+        'credit_noted_at' => 'datetime',
     ];
 
     // Relationships

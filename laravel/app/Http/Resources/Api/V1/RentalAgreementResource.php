@@ -394,7 +394,7 @@ class RentalAgreementResource extends JsonResource
                     $this->grace_period_days,
 
                 'deposit_ledger' => $this->when(
-                    $this->includeDetailPayload($request),
+                    $this->includeDepositLedger($request),
                     fn () => app(\App\Services\RentalDepositService::class)->summary(
                         (string) $this->agreement?->company_id,
                         (string) $this->id,
@@ -491,24 +491,6 @@ class RentalAgreementResource extends JsonResource
 
             /*
             |--------------------------------------------------------------------------
-            | Notes
-            |--------------------------------------------------------------------------
-            */
-
-            'notes' => [
-
-                'agreement_notes' =>
-
-                    $this->agreement
-                        ?->notes,
-
-                'special_terms' =>
-
-                    $this->special_terms,
-            ],
-
-            /*
-            |--------------------------------------------------------------------------
             | Audit Trail
             |--------------------------------------------------------------------------
             */
@@ -558,6 +540,22 @@ class RentalAgreementResource extends JsonResource
 
         $machine = app(\App\Services\Agreements\AgreementStateMachine::class);
 
+        $depositLedger = $agreement
+            ? app(\App\Services\RentalDepositService::class)->summary(
+                (string) $agreement->company_id,
+                (string) $this->id,
+            )
+            : null;
+
+        $collectableStatuses = [
+            \App\Models\Agreement::STATUS_APPROVED,
+            \App\Models\Agreement::STATUS_ACTIVE,
+        ];
+
+        $requiredDeposit = round((float) ($this->security_deposit ?? 0), 2);
+        $receivedDeposit = round((float) ($depositLedger['received'] ?? 0), 2);
+        $availableDeposit = round((float) ($depositLedger['available'] ?? 0), 2);
+
         return [
             'can_edit' => $agreement && ! $finalized,
             'can_delete' => $status === \App\Models\Agreement::STATUS_DRAFT,
@@ -568,12 +566,29 @@ class RentalAgreementResource extends JsonResource
                 && ($agreement->canBeActivated() ?? false)
                 && $machine->canTransition($agreement, \App\Models\Agreement::STATUS_ACTIVE),
             'can_terminate' => $status === \App\Models\Agreement::STATUS_ACTIVE,
+            'can_record_payment' => $status === \App\Models\Agreement::STATUS_ACTIVE,
+            'can_record_deposit' => in_array($status, $collectableStatuses, true)
+                && $requiredDeposit > 0.009
+                && $receivedDeposit + 0.009 < $requiredDeposit,
+            'can_refund_deposit' => $availableDeposit > 0.009
+                && ! in_array($status, [
+                    \App\Models\Agreement::STATUS_DRAFT,
+                    \App\Models\Agreement::STATUS_CANCELLED,
+                ], true),
+            'can_apply_deposit' => $status === \App\Models\Agreement::STATUS_ACTIVE
+                && $availableDeposit > 0.009,
         ];
     }
 
     protected function includeDetailPayload(Request $request): bool
     {
         return $request->routeIs('rental-agreements.show');
+    }
+
+    protected function includeDepositLedger(Request $request): bool
+    {
+        return $this->includeDetailPayload($request)
+            || $request->boolean('include_deposit_ledger');
     }
 
     protected function utilityUsagePayload(): array

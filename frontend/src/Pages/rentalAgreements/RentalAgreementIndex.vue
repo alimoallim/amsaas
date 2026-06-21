@@ -7,7 +7,7 @@
   >
     <template #actions>
       <ErpButton variant="ghost" size="sm" :loading="loading" @click="fetchList">Refresh</ErpButton>
-      <ErpButton @click="formModal.openCreate()">Create agreement</ErpButton>
+      <ErpButton :to="{ name: 'RentalAgreementCreate' }">Create agreement</ErpButton>
     </template>
 
     <template #kpis>
@@ -55,7 +55,7 @@
         @row-click="(row) => $router.push({ name: 'RentalAgreementShow', params: { id: row.id } })"
       >
         <template #emptyAction>
-          <ErpButton @click="formModal.openCreate()">Create agreement</ErpButton>
+          <ErpButton :to="{ name: 'RentalAgreementCreate' }">Create agreement</ErpButton>
         </template>
         <template #cell-agreement_number="{ row }">
           <code class="text-xs font-medium">{{ row.agreement_number }}</code>
@@ -81,13 +81,6 @@
       </DataTable>
     </template>
   </WorklistLayout>
-
-  <RentalAgreementFormModal
-    :open="formModal.state.open"
-    :entity-id="formModal.state.id"
-    @close="formModal.close()"
-    @saved="onSaved"
-  />
 
   <ErpModal
     :open="confirm.open"
@@ -116,12 +109,10 @@
 
 <script setup>
 import { reactive, ref, watch, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useRentalAgreements } from '@/composables/useRentalAgreements'
 import { useSmartFilters } from '@/composables/useSmartFilters'
-import { useFormModal } from '@/composables/useFormModal'
 import { compactActions, viewAction, editAction, deleteAction } from '@/composables/useTableActions'
-import RentalAgreementFormModal from '@/components/forms/RentalAgreementFormModal.vue'
 import {
   WorklistLayout,
   SmartFilterBar,
@@ -135,9 +126,7 @@ import {
   ErpModal,
 } from '@/components/erp'
 
-const route = useRoute()
 const router = useRouter()
-const formModal = useFormModal()
 const actionLoading = ref(null)
 
 const {
@@ -176,7 +165,7 @@ function agreementActions(row) {
   const c = row.controls || {}
   return compactActions([
     viewAction('RentalAgreementShow', row.id),
-    c.can_edit && editAction(() => formModal.openEdit(row.id)),
+    c.can_edit && editAction(() => router.push({ name: 'RentalAgreementEdit', params: { id: row.id } })),
     c.can_approve && {
       key: 'approve',
       label: 'Approve',
@@ -278,12 +267,7 @@ function formatMoney(v) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(v) || 0)
 }
 
-async function onSaved() {
-  await fetchList()
-}
-
 onMounted(() => {
-  formModal.syncFromRoute(route, router)
   fetchList()
 })
 </script>

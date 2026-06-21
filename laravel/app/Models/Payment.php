@@ -25,7 +25,9 @@ class Payment extends Model
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'refunded_amount' => 'decimal:2',
         'payment_date' => 'date',
+        'refunded_at' => 'datetime',
     ];
 
     // Relationships

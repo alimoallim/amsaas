@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('sale_deposit_applications', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('company_id')->constrained('companies')->cascadeOnDelete();
             $table->foreignUuid('sale_agreement_id')->constrained('sale_agreements')->cascadeOnDelete();
             $table->foreignUuid('sale_reservation_id')->constrained('sale_reservations')->cascadeOnDelete();

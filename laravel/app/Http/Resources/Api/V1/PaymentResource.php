@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Api\V1;
 
 use App\Services\Accounting\PostingRuleService;
+use App\Services\PaymentRefundService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -38,6 +39,10 @@ class PaymentResource extends JsonResource
             ]),
             'reference_number' => $this->reference_number,
             'status' => $this->status,
+            'refunded_amount' => (float) ($this->refunded_amount ?? 0),
+            'refundable_amount' => app(PaymentRefundService::class)->refundableAmount($this->resource),
+            'refund_reason' => $this->refund_reason,
+            'refunded_at' => $this->refunded_at?->toIso8601String(),
             'notes' => $this->notes,
             'tenant' => $this->whenLoaded('tenant', fn () => [
                 'id' => $this->tenant?->id,
@@ -72,6 +77,7 @@ class PaymentResource extends JsonResource
             'recorded_at' => $this->created_at?->toIso8601String(),
             'controls' => [
                 'can_view_receipt' => true,
+                'can_refund' => app(PaymentRefundService::class)->canRefund($this->resource),
             ],
         ];
     }

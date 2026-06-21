@@ -4,6 +4,7 @@ namespace App\Services\Collections;
 
 use App\Enums\CollectionReminderType;
 use App\Jobs\SendCollectionReminderJob;
+use App\Services\Notifications\SmsChannel;
 use App\Models\Agreement;
 use App\Models\CollectionReminderLog;
 use App\Models\Company;
@@ -137,17 +138,40 @@ class CollectionReminderService
             return;
         }
 
-        $recipient = trim((string) ($tenant?->email ?? ''));
-        if ($recipient === '') {
-            $log->update([
-                'status' => 'skipped_no_email',
-                'error_message' => 'Tenant has no email address.',
-            ]);
+        $tenantName = $this->tenantDisplayName($tenant);
+        $channel = $log->channel ?: 'email';
+
+        if ($channel === 'sms') {
+            $this->dispatchSms($log, $invoice, $tenant, $tenantName);
 
             return;
         }
 
-        $tenantName = $this->tenantDisplayName($tenant);
+        $this->dispatchEmail($log, $invoice, $tenant, $tenantName);
+    }
+
+    protected function dispatchEmail(
+        CollectionReminderLog $log,
+        MonthlyInvoice $invoice,
+        ?Tenant $tenant,
+        string $tenantName,
+    ): void {
+        $recipient = trim((string) ($tenant?->email ?? ''));
+        if ($recipient === '') {
+            if ($this->tenantPhone($tenant) !== '' && config('sms.enabled')) {
+                $log->update(['channel' => 'sms']);
+                $this->dispatchSms($log, $invoice, $tenant, $tenantName);
+
+                return;
+            }
+
+            $log->update([
+                'status' => 'skipped_no_contact',
+                'error_message' => 'Tenant has no email or phone for reminders.',
+            ]);
+
+            return;
+        }
 
         try {
             \Illuminate\Support\Facades\Mail::to($recipient)->send(
@@ -161,6 +185,51 @@ class CollectionReminderService
             $log->update([
                 'status' => 'sent',
                 'recipient' => $recipient,
+                'sent_at' => now(),
+                'error_message' => null,
+            ]);
+        } catch (\Throwable $e) {
+            $log->update([
+                'status' => 'failed',
+                'error_message' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
+    protected function dispatchSms(
+        CollectionReminderLog $log,
+        MonthlyInvoice $invoice,
+        ?Tenant $tenant,
+        string $tenantName,
+    ): void {
+        $phone = $this->tenantPhone($tenant);
+        if ($phone === '') {
+            $log->update([
+                'status' => 'skipped_no_phone',
+                'error_message' => 'Tenant has no phone number.',
+            ]);
+
+            return;
+        }
+
+        $message = sprintf(
+            '%s: Invoice %s balance %s due %s. %s',
+            config('app.name'),
+            $invoice->invoice_number,
+            number_format((float) $invoice->balance_due, 2),
+            $invoice->due_date?->format('Y-m-d') ?? 'soon',
+            ($log->reminder_type ?? CollectionReminderType::Manual)->label(),
+        );
+
+        try {
+            app(SmsChannel::class)->send($phone, $message);
+
+            $log->update([
+                'status' => 'sent',
+                'channel' => 'sms',
+                'recipient' => $phone,
                 'sent_at' => now(),
                 'error_message' => null,
             ]);
@@ -217,6 +286,7 @@ class CollectionReminderService
         if ($existing) {
             $existing->update([
                 'status' => 'queued',
+                'channel' => $this->resolveChannel($tenant),
                 'error_message' => null,
                 'triggered_by' => $actor?->id,
                 'delinquency_flag_id' => $flag?->id,
@@ -230,7 +300,7 @@ class CollectionReminderService
                 'monthly_invoice_id' => $invoice->id,
                 'delinquency_flag_id' => $flag?->id,
                 'reminder_type' => $type,
-                'channel' => 'email',
+                'channel' => $this->resolveChannel($tenant),
                 'status' => 'queued',
                 'triggered_by' => $actor?->id,
             ]);
@@ -239,6 +309,38 @@ class CollectionReminderService
         SendCollectionReminderJob::dispatch($log->id);
 
         return 'queued';
+    }
+
+    protected function resolveChannel(?Tenant $tenant): string
+    {
+        if (! config('sms.enabled')) {
+            return 'email';
+        }
+
+        $phone = $this->tenantPhone($tenant);
+        $email = trim((string) ($tenant?->email ?? ''));
+
+        if ($phone !== '' && ($email === '' || config('sms.prefer_sms'))) {
+            return 'sms';
+        }
+
+        return 'email';
+    }
+
+    protected function tenantPhone(?Tenant $tenant): string
+    {
+        if (! $tenant) {
+            return '';
+        }
+
+        foreach ([$tenant->phone, $tenant->alternate_phone] as $candidate) {
+            $normalized = trim((string) $candidate);
+            if ($normalized !== '') {
+                return $normalized;
+            }
+        }
+
+        return '';
     }
 
     protected function resolveTenant(MonthlyInvoice $invoice): ?Tenant

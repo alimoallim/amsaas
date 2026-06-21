@@ -1,13 +1,18 @@
 <?php
+
 namespace App\Http\Requests\Api\V1;
+
+use App\Models\Company;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateCompanyRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Security check: User can only update the company they belong to
-        return $this->company->id === $this->user()->company_id;
+        $company = $this->route('company');
+
+        return $company instanceof Company
+            && ($this->user()?->can('update', $company) ?? false);
     }
 
     public function rules(): array

@@ -9,6 +9,12 @@
     @apply mx-auto min-w-0 max-w-[1400px] space-y-5;
   }
 
+  .dashboard-home > section,
+  .dashboard-home > .erp-panel,
+  .dashboard-home > div {
+    @apply min-w-0;
+  }
+
   .erp-input {
     @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition;
     @apply placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20;

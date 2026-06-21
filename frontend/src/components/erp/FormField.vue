@@ -20,11 +20,14 @@ const props = defineProps({
   hint: { type: String, default: '' },
   error: { type: String, default: '' },
   required: { type: Boolean, default: false },
+  /** Stable DOM id for inputs (recommended on auth forms for mobile browsers). */
+  fieldId: { type: String, default: '' },
   /** 1 | 2 | 3 | full — span within FormGrid (2- or 3-column) */
   span: { type: String, default: '1' },
 })
 
-const id = useId()
+const autoId = useId()
+const id = computed(() => props.fieldId || autoId)
 
 const colSpan = computed(() => {
   const map = {

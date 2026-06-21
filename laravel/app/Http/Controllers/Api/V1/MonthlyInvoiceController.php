@@ -10,20 +10,27 @@ use App\Http\Resources\Api\V1\MonthlyInvoiceResource;
 use App\Models\Apartment;
 use App\Models\MonthlyInvoice;
 use App\Services\Billing\BillingPipelineService;
+use App\Services\Billing\InvoicePdfService;
+use App\Services\Billing\InvoiceCreditNoteService;
 use App\Services\Billing\InvoiceVoidService;
 use App\Services\Billing\ManualInvoiceService;
 use App\Services\Billing\MonthlyInvoiceListService;
 use App\Services\InvoiceGenerationService;
 use App\Services\InvoiceService;
 use App\Support\TenantContext;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class MonthlyInvoiceController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(MonthlyInvoiceIndexRequest $request): JsonResponse
     {
+        $this->authorize('viewAny', MonthlyInvoice::class);
+
         $user = $request->user();
         TenantContext::setCompanyId((string) $user->company_id);
 
@@ -54,6 +61,8 @@ class MonthlyInvoiceController extends Controller
 
     public function summary(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', MonthlyInvoice::class);
+
         $validated = $request->validate([
             'year' => 'required|integer|between:2020,2050',
             'month' => 'required|integer|between:1,12',
@@ -73,6 +82,8 @@ class MonthlyInvoiceController extends Controller
 
     public function bulkIssue(BulkIssueInvoicesRequest $request): JsonResponse
     {
+        $this->authorize('bulkManage', MonthlyInvoice::class);
+
         $user = $request->user();
         TenantContext::setCompanyId((string) $user->company_id);
 
@@ -100,7 +111,7 @@ class MonthlyInvoiceController extends Controller
 
     public function show(Request $request, MonthlyInvoice $invoice): JsonResponse
     {
-        abort_if($invoice->company_id !== $request->user()->company_id, 404);
+        $this->authorize('view', $invoice);
 
         $invoice->load([
             'lineItems',
@@ -120,25 +131,34 @@ class MonthlyInvoiceController extends Controller
         ]);
     }
 
-    public function download(Request $request, string $id)
+    public function download(Request $request, string $id, InvoicePdfService $pdfService)
     {
-        $invoice = MonthlyInvoice::query()
-            ->where('company_id', $request->user()->company_id)
-            ->findOrFail($id);
+        $invoice = MonthlyInvoice::query()->findOrFail($id);
+        $this->authorize('view', $invoice);
 
-        if (! $invoice->file_path) {
-            return response()->json(['message' => 'Invoice file path is not set.'], 404);
+        if (! $pdfService->isDownloadable($invoice)) {
+            return response()->json([
+                'message' => 'Only issued invoices can be downloaded. Issue the invoice first.',
+            ], 422);
         }
 
-        if (! Storage::disk('local')->exists($invoice->file_path)) {
-            return response()->json(['message' => 'The invoice file has not been generated or does not exist.'], 404);
+        $path = $pdfService->ensureReady($invoice);
+
+        if (! $path || ! Storage::disk('local')->exists($path)) {
+            return response()->json([
+                'message' => 'The invoice PDF could not be generated. Check server logs or try again shortly.',
+            ], 503);
         }
 
-        return response()->download(storage_path('app/'.$invoice->file_path));
+        $filename = ($invoice->invoice_number ?: 'invoice').'.pdf';
+
+        return Storage::disk('local')->download($path, $filename);
     }
 
     public function bulkMarkPaid(Request $request, InvoiceService $invoiceService): JsonResponse
     {
+        $this->authorize('bulkManage', MonthlyInvoice::class);
+
         $validated = $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'uuid|exists:monthly_invoices,id',
@@ -178,6 +198,8 @@ class MonthlyInvoiceController extends Controller
         ManualInvoiceService $manualInvoices,
         InvoiceGenerationService $autoGenerator,
     ): JsonResponse {
+        $this->authorize('create', MonthlyInvoice::class);
+
         TenantContext::setCompanyId((string) $request->user()->company_id);
 
         $validated = $request->validated();
@@ -189,12 +211,6 @@ class MonthlyInvoiceController extends Controller
             } else {
                 $apartment = Apartment::with(['building', 'activeLease.rentalAgreement'])
                     ->findOrFail($validated['apartment_id']);
-
-                abort_if(
-                    $apartment->building->company_id !== $request->user()->company_id,
-                    403,
-                    'Unauthorized access.'
-                );
 
                 $invoice = $autoGenerator->generateForApartment(
                     $apartment,
@@ -231,7 +247,7 @@ class MonthlyInvoiceController extends Controller
         MonthlyInvoice $invoice,
         InvoiceVoidService $voidService,
     ): JsonResponse {
-        abort_if($invoice->company_id !== $request->user()->company_id, 404);
+        $this->authorize('void', $invoice);
 
         $validated = $request->validate([
             'reason' => 'required|string|min:3|max:2000',
@@ -258,11 +274,45 @@ class MonthlyInvoiceController extends Controller
     }
 
     /**
+     * Issue a credit note on an issued invoice (reverses GL, releases charges).
+     */
+    public function creditNote(
+        Request $request,
+        MonthlyInvoice $invoice,
+        InvoiceCreditNoteService $creditNotes,
+    ): JsonResponse {
+        $this->authorize('creditNote', $invoice);
+
+        $validated = $request->validate([
+            'reason' => 'required|string|min:3|max:2000',
+        ]);
+
+        try {
+            $credited = $creditNotes->issue($invoice, $request->user(), $validated['reason']);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        }
+
+        $agreement = app(MonthlyInvoiceListService::class, ['user' => $request->user()])
+            ->agreementsForInvoices([$credited])
+            ->get($credited->contract_id);
+        if ($agreement) {
+            $credited->setRelation('resolvedAgreement', $agreement);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Credit note issued. Revenue and AR reversed; source charges released.',
+            'data' => new MonthlyInvoiceResource($credited),
+        ]);
+    }
+
+    /**
      * Finalize a draft invoice.
      */
     public function finalize(Request $request, MonthlyInvoice $invoice): JsonResponse
     {
-        abort_if($invoice->company_id !== $request->user()->company_id, 403, 'Unauthorized access.');
+        $this->authorize('finalize', $invoice);
 
         if ($invoice->status !== 'draft') {
             return response()->json(['message' => 'Only draft invoices can be issued.'], 422);

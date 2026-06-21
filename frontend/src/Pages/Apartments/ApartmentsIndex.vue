@@ -6,7 +6,7 @@
     description="Unit inventory, occupancy status, and listing configuration."
   >
     <template #actions>
-      <ErpButton @click="formModal.openCreate()">New apartment</ErpButton>
+      <ErpButton :to="{ name: 'ApartmentCreate' }">New apartment</ErpButton>
     </template>
 
     <template #kpis>
@@ -65,7 +65,7 @@
         @row-click="(row) => $router.push({ name: 'ApartmentShow', params: { id: row.id } })"
       >
         <template #emptyAction>
-          <ErpButton @click="formModal.openCreate()">New apartment</ErpButton>
+          <ErpButton :to="{ name: 'ApartmentCreate' }">New apartment</ErpButton>
         </template>
         <template #cell-unit="{ row }">
           <div>
@@ -110,12 +110,6 @@
     </template>
   </WorklistLayout>
 
-  <ApartmentFormModal
-    :open="formModal.state.open"
-    :entity-id="formModal.state.id"
-    @close="formModal.close()"
-    @saved="onSaved"
-  />
 </template>
 
 <script setup>
@@ -123,9 +117,7 @@ import { computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApartments } from '@/composables/useApartments'
 import { useSmartFilters } from '@/composables/useSmartFilters'
-import { useFormModal } from '@/composables/useFormModal'
 import { compactActions, viewAction, editAction } from '@/composables/useTableActions'
-import ApartmentFormModal from '@/components/forms/ApartmentFormModal.vue'
 import {
   WorklistLayout,
   SmartFilterBar,
@@ -140,7 +132,6 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const formModal = useFormModal()
 const {
   items,
   buildings,
@@ -191,7 +182,7 @@ const columns = [
 function apartmentActions(row) {
   return compactActions([
     viewAction('ApartmentShow', row.id),
-    row.controls?.can_edit !== false && editAction(() => formModal.openEdit(row.id)),
+    row.controls?.can_edit !== false && editAction(() => router.push({ name: 'ApartmentEdit', params: { id: row.id } })),
   ])
 }
 
@@ -231,14 +222,8 @@ function formatMoney(v, c = 'USD') {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: c || 'USD' }).format(v)
 }
 
-async function onSaved() {
-  await fetchList(meta.value.current_page)
-  await fetchSummary()
-}
-
 onMounted(async () => {
   bindRoute(route, router, { debounceMs: 300 })
-  formModal.syncFromRoute(route, router)
   await fetchBuildings()
   await fetchSummary()
   if (route.query.building_id) smartFilters.building_id = String(route.query.building_id)

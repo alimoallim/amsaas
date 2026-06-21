@@ -3,6 +3,8 @@
 namespace App\Http\Resources\Api\V1;
 
 use App\Enums\MonthlyInvoiceStatus;
+use App\Services\Billing\InvoiceCreditNoteService;
+use App\Services\Billing\InvoicePdfService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -45,6 +47,9 @@ class MonthlyInvoiceResource extends JsonResource
             'dispatch_status' => $this->dispatch_status,
             'void_reason' => $this->void_reason,
             'voided_at' => optional($this->voided_at)->toIso8601String(),
+            'credit_note_number' => $this->credit_note_number,
+            'credit_note_reason' => $this->credit_note_reason,
+            'credit_noted_at' => optional($this->credit_noted_at)->toIso8601String(),
             'finalized_at' => optional($this->finalized_at)->toIso8601String(),
             'apartment' => $this->whenLoaded('apartment', fn () => [
                 'id' => $this->apartment?->id,
@@ -82,8 +87,11 @@ class MonthlyInvoiceResource extends JsonResource
             'controls' => [
                 'can_issue' => $status?->isIssuable() ?? false,
                 'can_void' => $status?->isVoidable() ?? false,
+                'can_credit_note' => $status
+                    && app(InvoiceCreditNoteService::class)->isCreditable($status)
+                    && (float) $this->paid_amount <= 0.009,
                 'can_edit' => $status === MonthlyInvoiceStatus::Draft,
-                'can_download' => ! empty($this->file_path),
+                'can_download' => app(InvoicePdfService::class)->isDownloadable($this->resource),
                 'can_resend_email' => $status
                     && ! in_array($status, [MonthlyInvoiceStatus::Draft, MonthlyInvoiceStatus::Cancelled], true)
                     && ! empty($this->file_path),

@@ -10,6 +10,7 @@ use App\Models\Apartment;
 use App\Models\ApartmentOwnershipHistory;
 use App\Services\Property\ApartmentInventoryService;
 use App\Services\Property\BuildingPortfolioService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,8 @@ use Illuminate\Validation\Rule;
 
 class ApartmentController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __construct(
         private readonly BuildingPortfolioService $buildings,
         private readonly ApartmentInventoryService $inventory,
@@ -31,6 +34,8 @@ class ApartmentController extends Controller
         Request $request
     )
     {
+        $this->authorize('viewAny', Apartment::class);
+
         $query = Apartment::query()
             ->with(['building', 'activeLease'])
             ->withCount([
@@ -207,6 +212,8 @@ class ApartmentController extends Controller
         Request $request
     ): JsonResponse
     {
+        $this->authorize('create', Apartment::class);
+
         $validated = $request->validate([
 
             'building_id' => [
@@ -479,15 +486,7 @@ class ApartmentController extends Controller
         Apartment $apartment
     ): JsonResponse
     {
-        abort_if(
-
-            $apartment->company_id
-            !== $request->user()->company_id,
-
-            403,
-
-            'Unauthorized access.'
-        );
+        $this->authorize('view', $apartment);
 
         return response()->json([
 
@@ -519,15 +518,7 @@ class ApartmentController extends Controller
         Apartment $apartment
     ): JsonResponse
     {
-        abort_if(
-
-            $apartment->company_id
-            !== $request->user()->company_id,
-
-            403,
-
-            'Unauthorized access.'
-        );
+        $this->authorize('update', $apartment);
 
         $validated = $request->validate([
 
@@ -770,15 +761,7 @@ class ApartmentController extends Controller
         Apartment $apartment
     ): JsonResponse
     {
-        abort_if(
-
-            $apartment->company_id
-            !== $request->user()->company_id,
-
-            403,
-
-            'Unauthorized access.'
-        );
+        $this->authorize('delete', $apartment);
 
         try {
 
@@ -830,6 +813,8 @@ class ApartmentController extends Controller
         Request $request
     ): JsonResponse
     {
+        $this->authorize('viewAny', Apartment::class);
+
         $query = Apartment::query()
 
             ->where(
@@ -954,6 +939,8 @@ class ApartmentController extends Controller
                 'message' => 'Apartment not found.',
             ], 404);
         }
+
+        $this->authorize('view', $unit);
 
         $history = ApartmentOwnershipHistory::query()
             ->with(['buyer', 'saleAgreement.agreement', 'recordedBy'])

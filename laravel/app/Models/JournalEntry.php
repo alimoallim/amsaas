@@ -66,6 +66,12 @@ class JournalEntry extends Model
 
     public const SOURCE_SALE_DEPOSIT_APPLICATION = 'sale_deposit_application';
 
+    public const SOURCE_INVOICE_CREDIT_NOTE = 'monthly_invoice_credit_note';
+
+    public const SOURCE_PAYMENT_ALLOCATION_REVERSAL = 'payment_allocation_reversal';
+
+    public const SOURCE_PAYMENT_REFUND = 'payment_refund';
+
     public function lines(): HasMany
     {
         return $this->hasMany(JournalEntryLine::class)->orderBy('line_order');

@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('apartment_inventory_status_logs', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('company_id')->constrained('companies')->cascadeOnDelete();
             $table->foreignUuid('apartment_id')->constrained('apartments')->cascadeOnDelete();
             $table->string('from_status', 50)->nullable();

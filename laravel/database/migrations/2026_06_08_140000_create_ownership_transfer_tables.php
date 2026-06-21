@@ -15,7 +15,7 @@ return new class extends Migration
         });
 
         Schema::create('apartment_ownership_history', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('company_id')->constrained('companies')->cascadeOnDelete();
             $table->foreignUuid('apartment_id')->constrained('apartments')->cascadeOnDelete();
             $table->foreignUuid('buyer_id')->constrained('buyers')->cascadeOnDelete();
@@ -31,7 +31,7 @@ return new class extends Migration
         });
 
         Schema::create('sale_ownership_approvals', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('company_id')->constrained('companies')->cascadeOnDelete();
             $table->foreignUuid('sale_agreement_id')->constrained('sale_agreements')->cascadeOnDelete();
             $table->string('step', 20);

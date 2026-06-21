@@ -41,7 +41,20 @@ class PdfGeneratorService
         ]);
 
         $path = "invoices/{$invoice->company_id}/{$invoice->id}.pdf";
-        Storage::disk('local')->put($path, $pdf->output());
+        $directory = dirname($path);
+
+        if (! Storage::disk('local')->exists($directory)) {
+            Storage::disk('local')->makeDirectory($directory);
+        }
+
+        if (! Storage::disk('local')->put($path, $pdf->output())) {
+            Log::warning('Invoice PDF could not be written to storage.', [
+                'invoice_id' => $invoice->id,
+                'path' => $path,
+            ]);
+
+            return null;
+        }
 
         return $path;
     }

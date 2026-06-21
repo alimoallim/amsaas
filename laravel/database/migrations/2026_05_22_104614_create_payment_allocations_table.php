@@ -8,7 +8,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('payment_allocations', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('payment_id')->constrained('payments')->onDelete('cascade');
             $table->foreignUuid('monthly_invoice_id')->constrained('monthly_invoices')->onDelete('cascade');
             $table->decimal('amount_allocated', 12, 2);

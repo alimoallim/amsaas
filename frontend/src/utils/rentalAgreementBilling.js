@@ -421,8 +421,6 @@ export function buildRentalAgreementPayload(
     payment_due_day: form.payment_due_day,
     auto_renew: form.auto_renew,
     renewal_notice_days: form.renewal_notice_days,
-    notes: form.notes || null,
-    special_terms: form.special_terms || null,
     ...billingFieldsForApi(form),
   }
 

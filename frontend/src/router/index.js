@@ -83,6 +83,8 @@ import ApartmentShow
 
 import TenantsIndex
   from '@/Pages/Tenants/TenantIndex.vue'
+import TenantShow
+  from '@/Pages/Tenants/TenantShow.vue'
 import TenantBilling
   from '@/Pages/Tenants/TenantBilling.vue'
 
@@ -210,6 +212,15 @@ import SettingsIndex
 import FormRouteRedirect
   from '@/components/forms/FormRouteRedirect.vue'
 
+import TransactionalFormRoutePage
+  from '@/components/erp/TransactionalFormRoutePage.vue'
+
+import RentalAgreementFormPage
+  from '@/Pages/rentalAgreements/RentalAgreementFormPage.vue'
+
+import ChargeModelFormPage
+  from '@/Pages/ChargeModels/ChargeModelFormPage.vue'
+
 /*
 |--------------------------------------------------------------------------
 | Routes
@@ -330,12 +341,11 @@ const routes = [
 
         name: 'BuildingCreate',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         meta: {
           title: 'Create Building',
-          listRouteName: 'Buildings',
-          formMode: 'create',
+          transactionalForm: 'building',
         },
       },
 
@@ -358,15 +368,13 @@ const routes = [
 
         name: 'BuildingEdit',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         props: true,
 
         meta: {
           title: 'Edit Building',
-          listRouteName: 'Buildings',
-          formMode: 'edit',
-          formIdParam: 'id',
+          transactionalForm: 'building',
         },
       },
 
@@ -393,12 +401,11 @@ const routes = [
 
         name: 'ApartmentCreate',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         meta: {
           title: 'Create Apartment',
-          listRouteName: 'Apartments',
-          formMode: 'create',
+          transactionalForm: 'apartment',
         },
       },
 
@@ -421,15 +428,13 @@ const routes = [
 
         name: 'ApartmentEdit',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         props: true,
 
         meta: {
           title: 'Edit Apartment',
-          listRouteName: 'Apartments',
-          formMode: 'edit',
-          formIdParam: 'id',
+          transactionalForm: 'apartment',
         },
       },
 
@@ -456,12 +461,11 @@ const routes = [
 
         name: 'TenantCreate',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         meta: {
           title: 'Create Tenant',
-          listRouteName: 'Tenants',
-          formMode: 'create',
+          transactionalForm: 'tenant',
         },
       },
 
@@ -470,15 +474,13 @@ const routes = [
 
         name: 'TenantEdit',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         props: true,
 
         meta: {
           title: 'Edit Tenant',
-          listRouteName: 'Tenants',
-          formMode: 'edit',
-          formIdParam: 'id',
+          transactionalForm: 'tenant',
         },
       },
 
@@ -493,6 +495,20 @@ const routes = [
 
         meta: {
           title: 'Tenant billing',
+        },
+      },
+
+      {
+        path: 'tenants/:id',
+
+        name: 'TenantShow',
+
+        component: TenantShow,
+
+        props: true,
+
+        meta: {
+          title: 'Tenant',
         },
       },
 
@@ -541,24 +557,21 @@ const routes = [
       {
         path: 'sales/buyers/create',
         name: 'BuyerCreate',
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
         meta: {
           title: 'Create buyer',
-          listRouteName: 'Buyers',
-          formMode: 'create',
+          transactionalForm: 'buyer',
         },
       },
 
       {
         path: 'sales/buyers/:id/edit',
         name: 'BuyerEdit',
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
         props: true,
         meta: {
           title: 'Edit buyer',
-          listRouteName: 'Buyers',
-          formMode: 'edit',
-          formIdParam: 'id',
+          transactionalForm: 'buyer',
         },
       },
 
@@ -585,12 +598,10 @@ const routes = [
 
         name: 'RentalAgreementCreate',
 
-        component: FormRouteRedirect,
+        component: RentalAgreementFormPage,
 
         meta: {
           title: 'Create Rental Agreement',
-          listRouteName: 'RentalAgreementIndex',
-          formMode: 'create',
         },
       },
 
@@ -611,15 +622,12 @@ const routes = [
 
         name: 'RentalAgreementEdit',
 
-        component: FormRouteRedirect,
+        component: RentalAgreementFormPage,
 
         props: true,
 
         meta: {
           title: 'Edit Rental Agreement',
-          listRouteName: 'RentalAgreementIndex',
-          formMode: 'edit',
-          formIdParam: 'id',
         },
       },
 
@@ -642,12 +650,11 @@ const routes = [
 
         name: 'MeterCreate',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         meta: {
           title: 'Register Meter',
-          listRouteName: 'Meters',
-          formMode: 'create',
+          transactionalForm: 'meter',
         },
       },
 
@@ -669,15 +676,13 @@ const routes = [
 
         name: 'MeterEdit',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         props: true,
 
         meta: {
           title: 'Edit Meter',
-          listRouteName: 'Meters',
-          formMode: 'edit',
-          formIdParam: 'id',
+          transactionalForm: 'meter',
         },
       },
     
@@ -729,12 +734,11 @@ const routes = [
 
         name: 'MeterReadingCreate',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         meta: {
           title: 'Capture Meter Reading',
-          listRouteName: 'MeterReadings',
-          formMode: 'create',
+          transactionalForm: 'meter-reading',
         },
       },
 
@@ -755,15 +759,13 @@ const routes = [
 
         name: 'MeterReadingEdit',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         props: true,
 
         meta: {
           title: 'Edit Meter Reading',
-          listRouteName: 'MeterReadings',
-          formMode: 'edit',
-          formIdParam: 'id',
+          transactionalForm: 'meter-reading',
         },
       },
 
@@ -849,12 +851,11 @@ const routes = [
 
         name: 'AccountCreate',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         meta: {
           title: 'Create Account',
-          listRouteName: 'Accounts',
-          formMode: 'create',
+          transactionalForm: 'account',
         },
       },
       {
@@ -862,15 +863,13 @@ const routes = [
 
         name: 'AccountEdit',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         props: true,
 
         meta: {
           title: 'Edit Account',
-          listRouteName: 'Accounts',
-          formMode: 'edit',
-          formIdParam: 'id',
+          transactionalForm: 'account',
         },
       },
 
@@ -890,12 +889,11 @@ const routes = [
 
         name: 'ChargeTypeCreate',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         meta: {
           title: 'Create Charge Type',
-          listRouteName: 'ChargeTypes',
-          formMode: 'create',
+          transactionalForm: 'charge-type',
         },
       },
       {
@@ -903,15 +901,13 @@ const routes = [
 
         name: 'ChargeTypeEdit',
 
-        component: FormRouteRedirect,
+        component: TransactionalFormRoutePage,
 
         props: true,
 
         meta: {
           title: 'Edit Charge Type',
-          listRouteName: 'ChargeTypes',
-          formMode: 'edit',
-          formIdParam: 'id',
+          transactionalForm: 'charge-type',
         },
       },
 
@@ -931,12 +927,10 @@ const routes = [
 
         name: 'ChargeModelCreate',
 
-        component: FormRouteRedirect,
+        component: ChargeModelFormPage,
 
         meta: {
           title: 'Create Charge Model',
-          listRouteName: 'ChargeModels',
-          formMode: 'create',
         },
       },
       {
@@ -955,15 +949,12 @@ const routes = [
 
         name: 'ChargeModelEdit',
 
-        component: FormRouteRedirect,
+        component: ChargeModelFormPage,
 
         props: true,
 
         meta: {
           title: 'Edit Charge Model',
-          listRouteName: 'ChargeModels',
-          formMode: 'edit',
-          formIdParam: 'id',
         },
       },
 

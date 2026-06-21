@@ -6,7 +6,7 @@
     description="Tenant records, contact details, and operational status."
   >
     <template #actions>
-      <ErpButton @click="formModal.openCreate()">New tenant</ErpButton>
+      <ErpButton :to="{ name: 'TenantCreate' }">New tenant</ErpButton>
     </template>
 
     <template #kpis>
@@ -53,10 +53,10 @@
         empty-title="No tenants"
         empty-description="Create a tenant or adjust filters."
         @page-change="fetchList"
-        @row-click="(row) => formModal.openEdit(row.id)"
+        @row-click="(row) => router.push({ name: 'TenantShow', params: { id: row.id } })"
       >
         <template #emptyAction>
-          <ErpButton @click="formModal.openCreate()">New tenant</ErpButton>
+          <ErpButton :to="{ name: 'TenantCreate' }">New tenant</ErpButton>
         </template>
         <template #cell-name="{ row }">
           <span class="font-medium">{{ tenantDisplayName(row) || '—' }}</span>
@@ -89,12 +89,6 @@
     </template>
   </WorklistLayout>
 
-  <TenantFormModal
-    :open="formModal.state.open"
-    :entity-id="formModal.state.id"
-    @close="formModal.close()"
-    @saved="onSaved"
-  />
 </template>
 
 <script setup>
@@ -102,9 +96,7 @@ import { watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTenants } from '@/composables/useTenants'
 import { useSmartFilters } from '@/composables/useSmartFilters'
-import { useFormModal } from '@/composables/useFormModal'
 import { compactActions, editAction, viewAction } from '@/composables/useTableActions'
-import TenantFormModal from '@/components/forms/TenantFormModal.vue'
 import { tenantDisplayName } from '@/utils/tenantDisplayName'
 import {
   WorklistLayout,
@@ -120,7 +112,6 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const formModal = useFormModal()
 const { items, loading, meta, filters, summary, fetchList, resetFilters } = useTenants()
 
 const { filters: smartFilters, chips, clearAll, removeChip, bindRoute } = useSmartFilters({
@@ -148,8 +139,13 @@ const columns = [
 
 function tenantActions(row) {
   return compactActions([
-    viewAction('TenantBilling', row.id, 'Billing'),
-    editAction(() => formModal.openEdit(row.id), 'Edit'),
+    viewAction('TenantShow', row.id),
+    {
+      key: 'billing',
+      label: 'Billing',
+      to: { name: 'TenantBilling', params: { id: row.id } },
+    },
+    editAction(() => router.push({ name: 'TenantEdit', params: { id: row.id } }), 'Edit'),
   ])
 }
 
@@ -183,13 +179,8 @@ function onClearAll() {
   syncAndFetch()
 }
 
-async function onSaved() {
-  await fetchList(meta.value.current_page)
-}
-
 onMounted(() => {
   bindRoute(route, router, { debounceMs: 300 })
-  formModal.syncFromRoute(route, router)
   fetchList()
 })
 </script>

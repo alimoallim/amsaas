@@ -12,6 +12,11 @@ class CompanyPolicy
         return ! empty($user->company_id);
     }
 
+    public function create(User $user): bool
+    {
+        return (bool) $user->id;
+    }
+
     public function view(User $user, Company $company): bool
     {
         return $user->company_id === $company->id;

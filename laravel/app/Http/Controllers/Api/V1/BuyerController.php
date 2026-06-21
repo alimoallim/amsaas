@@ -9,6 +9,7 @@ use App\Http\Resources\Api\V1\BuyerResource;
 use App\Models\Agreement;
 use App\Models\Buyer;
 use App\Services\Property\BuyerProfileService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -16,12 +17,16 @@ use Illuminate\Support\Str;
 
 class BuyerController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __construct(
         private readonly BuyerProfileService $buyerProfiles,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
+        $this->authorize('viewAny', Buyer::class);
+
         $buyers = Buyer::query()
             ->where('company_id', $request->user()->company_id)
             ->with('tenant')
@@ -56,6 +61,8 @@ class BuyerController extends Controller
 
     public function store(StoreBuyerRequest $request): JsonResponse
     {
+        $this->authorize('create', Buyer::class);
+
         $validated = $request->validated();
         $validated['company_id'] = $request->user()->company_id;
         $validated['buyer_code'] = $this->generateBuyerCode();
@@ -78,7 +85,7 @@ class BuyerController extends Controller
 
     public function show(Request $request, Buyer $buyer): BuyerResource
     {
-        abort_if($buyer->company_id !== $request->user()->company_id, 403, 'Unauthorized access.');
+        $this->authorize('view', $buyer);
 
         $buyer->load('tenant');
         $buyer->loadCount([
@@ -96,7 +103,7 @@ class BuyerController extends Controller
 
     public function update(UpdateBuyerRequest $request, Buyer $buyer): JsonResponse
     {
-        abort_if($buyer->company_id !== $request->user()->company_id, 403, 'Unauthorized access.');
+        $this->authorize('update', $buyer);
 
         $validated = $request->validated();
 
@@ -120,7 +127,7 @@ class BuyerController extends Controller
 
     public function destroy(Request $request, Buyer $buyer): JsonResponse
     {
-        abort_if($buyer->company_id !== $request->user()->company_id, 403, 'Unauthorized access.');
+        $this->authorize('delete', $buyer);
 
         $this->buyerProfiles->assertCanDelete($buyer);
         $buyer->delete();

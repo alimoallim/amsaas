@@ -228,12 +228,12 @@
                   :type="showPassword ? 'text' : 'password'"
                   required
                   placeholder="Min. 8 characters"
-                  class="erp-input pr-10"
+                  class="erp-input relative z-0 pr-11"
                   :class="{ 'erp-input--error': errors.password }"
                 />
                 <button
                   type="button"
-                  class="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  class="absolute right-1 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
                   @click="showPassword = !showPassword"
                 >

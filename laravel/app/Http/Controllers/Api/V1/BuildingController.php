@@ -7,11 +7,14 @@ use App\Models\Building;
 use App\Http\Requests\Api\V1\StoreBuildingRequest;
 use App\Http\Resources\Api\V1\BuildingResource;
 use App\Services\Property\BuildingPortfolioService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class BuildingController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __construct(
         private readonly BuildingPortfolioService $portfolio,
     ) {}
@@ -23,6 +26,8 @@ class BuildingController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Building::class);
+
         $query = Building::query()->withCount('apartments');
 
         if ($request->filled('search')) {
@@ -61,6 +66,7 @@ class BuildingController extends Controller
     public function store(
         StoreBuildingRequest $request
     ) {
+        $this->authorize('create', Building::class);
 
         $validated =
             $request->validated();
@@ -160,6 +166,7 @@ public function update(
     StoreBuildingRequest $request,
     Building $building
 ) {
+    $this->authorize('update', $building);
 
     $validated =
         $request->validated();
@@ -237,6 +244,7 @@ public function update(
 public function show(
     Building $building
 ) {
+    $this->authorize('view', $building);
 
     return response()->json([
 
@@ -256,6 +264,8 @@ public function show(
 
 public function destroy(Building $building): JsonResponse
 {
+    $this->authorize('delete', $building);
+
     $this->portfolio->assertCanDelete($building);
     $building->delete();
 

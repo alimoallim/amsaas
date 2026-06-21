@@ -9,7 +9,7 @@
       <ErpButton variant="ghost" size="sm" :loading="loading" @click="fetchList(meta.current_page)">
         Refresh
       </ErpButton>
-      <ErpButton @click="formModal.openCreate()">Add building</ErpButton>
+      <ErpButton :to="{ name: 'BuildingCreate' }">Add building</ErpButton>
     </template>
 
     <template #kpis>
@@ -55,7 +55,7 @@
         @row-click="onRowClick"
       >
         <template #emptyAction>
-          <ErpButton @click="formModal.openCreate()">Add building</ErpButton>
+          <ErpButton :to="{ name: 'BuildingCreate' }">Add building</ErpButton>
         </template>
         <template #cell-name="{ row }">
           <div>
@@ -95,12 +95,6 @@
     </template>
   </WorklistLayout>
 
-  <BuildingFormModal
-    :open="formModal.state.open"
-    :entity-id="formModal.state.id"
-    @close="formModal.close()"
-    @saved="fetchList(meta.current_page)"
-  />
 </template>
 
 <script setup>
@@ -108,10 +102,8 @@ import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBuildings } from '@/composables/useBuildings'
 import { useSmartFilters } from '@/composables/useSmartFilters'
-import { useFormModal } from '@/composables/useFormModal'
 import { useConfirm } from '@/composables/useConfirm'
 import { compactActions, viewAction, editAction, deleteAction } from '@/composables/useTableActions'
-import BuildingFormModal from '@/components/forms/BuildingFormModal.vue'
 import {
   WorklistLayout,
   SmartFilterBar,
@@ -127,7 +119,6 @@ import {
 
 const router = useRouter()
 const route = useRoute()
-const formModal = useFormModal()
 const error = ref('')
 const { items, loading, meta, filters, summary, fetchList, remove, resetFilters } = useBuildings()
 
@@ -156,7 +147,7 @@ const columns = [
 function buildingActions(row) {
   return compactActions([
     viewAction('BuildingShow', row.id),
-    editAction(() => formModal.openEdit(row.id)),
+    editAction(() => router.push({ name: 'BuildingEdit', params: { id: row.id } })),
     row.controls?.can_delete && deleteAction(() => onDelete(row)),
   ])
 }
@@ -191,7 +182,6 @@ async function onDelete(row) {
 
 onMounted(() => {
   bindRoute(route, router, { debounceMs: 300 })
-  formModal.syncFromRoute(route, router)
   fetchList()
 })
 </script>

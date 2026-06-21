@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('monthly_invoices', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('company_id')->constrained('companies')->onDelete('cascade');
             $table->foreignUuid('apartment_id')->constrained('apartments')->onDelete('cascade');
             $table->string('invoice_number', 100)->unique();

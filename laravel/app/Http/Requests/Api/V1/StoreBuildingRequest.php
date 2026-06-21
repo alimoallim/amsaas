@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\Building;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -12,7 +13,13 @@ class StoreBuildingRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        $building = $this->route('building');
+
+        if ($building instanceof Building) {
+            return $this->user()?->can('update', $building) ?? false;
+        }
+
+        return $this->user()?->can('create', Building::class) ?? false;
     }
 
     /**

@@ -1,5 +1,5 @@
 <template>
-  <div class="flex min-h-[100dvh] flex-col justify-start bg-slate-50 px-4 py-6 sm:justify-center sm:px-6 sm:py-10 lg:px-8 dark:bg-[var(--erp-bg)]">
+  <div class="flex min-h-full flex-col justify-start bg-slate-50 px-4 py-6 sm:min-h-[100dvh] sm:justify-center sm:px-6 sm:py-10 lg:px-8 dark:bg-[var(--erp-bg)]">
     <div class="mx-auto w-full max-w-2xl min-w-0">
 
       <!-- Step Tracker -->

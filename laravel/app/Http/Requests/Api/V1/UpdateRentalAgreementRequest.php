@@ -22,7 +22,7 @@ class UpdateRentalAgreementRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return auth::check();
+        return $this->user()?->can('viewAny', RentalAgreement::class) ?? false;
     }
 
     /*
@@ -129,12 +129,10 @@ class UpdateRentalAgreementRequest extends FormRequest
 
             /*
             |--------------------------------------------------------------------------
-            | Files & Notes
+            | Files
             |--------------------------------------------------------------------------
             */
             'contract_file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
-            'notes'         => ['nullable', 'string'],
-            'special_terms' => ['nullable', 'string'],
 
             /*
             |--------------------------------------------------------------------------

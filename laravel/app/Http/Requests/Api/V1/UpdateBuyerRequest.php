@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\Buyer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -9,7 +10,10 @@ class UpdateBuyerRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $buyer = $this->route('buyer');
+
+        return $buyer instanceof Buyer
+            && ($this->user()?->can('update', $buyer) ?? false);
     }
 
     protected function prepareForValidation(): void

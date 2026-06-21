@@ -65,7 +65,12 @@ class RentalDepositService
     {
         return DB::transaction(function () use ($user, $data) {
             $amount = $this->positiveAmount($data['amount']);
-            $agreement = $this->resolveRentalAgreement($user, $data['agreement_id'], $data['tenant_id']);
+            $agreement = $this->resolveRentalAgreement(
+                $user,
+                $data['agreement_id'],
+                $data['tenant_id'],
+                [Agreement::STATUS_APPROVED, Agreement::STATUS_ACTIVE],
+            );
 
             $payment = Payment::create(array_merge([
                 'company_id' => $user->company_id,
@@ -97,6 +102,12 @@ class RentalDepositService
         return DB::transaction(function () use ($user, $data) {
             $amount = $this->positiveAmount($data['amount']);
             $agreement = $this->resolveRentalAgreement($user, $data['agreement_id'], $data['tenant_id']);
+
+            if (in_array($agreement->status, [Agreement::STATUS_DRAFT, Agreement::STATUS_CANCELLED], true)) {
+                throw ValidationException::withMessages([
+                    'agreement_id' => ['Deposit refunds are not allowed for draft or cancelled agreements.'],
+                ]);
+            }
 
             $available = $this->summary($user->company_id, $agreement->id)['available'];
             if ($amount > $available + 0.009) {
@@ -195,8 +206,12 @@ class RentalDepositService
         });
     }
 
-    protected function resolveRentalAgreement(User $user, string $agreementId, string $tenantId): Agreement
-    {
+    protected function resolveRentalAgreement(
+        User $user,
+        string $agreementId,
+        string $tenantId,
+        ?array $allowedStatuses = null,
+    ): Agreement {
         $agreement = Agreement::query()
             ->where('company_id', $user->company_id)
             ->where('id', $agreementId)
@@ -207,6 +222,12 @@ class RentalDepositService
         if (! $agreement) {
             throw ValidationException::withMessages([
                 'agreement_id' => ['Select a rental agreement for this tenant.'],
+            ]);
+        }
+
+        if ($allowedStatuses !== null && ! in_array($agreement->status, $allowedStatuses, true)) {
+            throw ValidationException::withMessages([
+                'agreement_id' => ['This rental agreement cannot accept deposit transactions in its current state.'],
             ]);
         }
 

@@ -1,6 +1,6 @@
 <template>
   <div v-if="loading" class="py-8 text-center text-sm text-slate-500">Loading…</div>
-  <form v-else class="meter-form-content" @submit.prevent="submit">
+  <div v-else class="meter-form-content">
     <AlertBanner v-if="serverError" :message="serverError" variant="error" @dismiss="serverError = ''" />
 
     <FormSection
@@ -222,7 +222,7 @@
         </FormField>
       </FormGrid>
     </FormSection>
-  </form>
+  </div>
 </template>
 
 <script setup>

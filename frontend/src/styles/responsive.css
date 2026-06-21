@@ -10,13 +10,36 @@ body {
   overflow-x: clip;
 }
 
+/* Reliable tap targets on touch devices (Android Chrome / WebView) */
+@media (hover: none) and (pointer: coarse) {
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  [role='button'],
+  .nav-item,
+  .nav-subitem,
+  .router-link-active {
+    touch-action: manipulation;
+  }
+
+  input,
+  select,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
 /* iOS: 16px inputs avoid focus zoom */
 @layer components {
   @media (max-width: 639px) {
     .erp-input,
     .erp-select,
     .erp-date-input__trigger {
-      font-size: 1rem;
+      font-size: 16px;
       line-height: 1.5rem;
       min-height: 2.75rem;
     }
@@ -25,6 +48,159 @@ body {
       @apply space-y-4;
     }
   }
+
+  /*
+   * Auth screens on phones/tablets: normal document scroll (no flex + dvh trap).
+   * Uses .auth-route on html/body (set by AuthShellLayout) — not :has() (Android gaps).
+   */
+  @media (max-width: 1023px) {
+    html.auth-route,
+    body.auth-route {
+      height: auto;
+      min-height: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    body.auth-route #app {
+      height: auto;
+      min-height: 100%;
+    }
+
+    .auth-shell {
+      display: block;
+      min-height: auto;
+      height: auto;
+      overflow: visible;
+    }
+
+    .auth-shell-panel,
+    .auth-shell-main,
+    .auth-shell-form {
+      display: block;
+      overflow: visible;
+      min-height: auto;
+      height: auto;
+    }
+
+    .auth-shell-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: inherit;
+    }
+
+    .auth-shell .erp-input,
+    .auth-shell input[type='email'],
+    .auth-shell input[type='password'],
+    .auth-shell input[type='text'],
+    .auth-shell textarea,
+    .auth-shell select {
+      position: relative;
+      z-index: 2;
+      font-size: 16px;
+      line-height: 1.5rem;
+      min-height: 2.75rem;
+      touch-action: manipulation;
+      -webkit-user-select: text;
+      user-select: text;
+      pointer-events: auto;
+    }
+
+    .auth-shell .erp-form-field__control {
+      position: relative;
+      z-index: 1;
+      pointer-events: auto;
+    }
+
+    .auth-shell section.overflow-hidden,
+    .auth-shell .overflow-hidden {
+      overflow: visible;
+    }
+
+    .auth-login-form,
+    .auth-login-panel {
+      touch-action: manipulation;
+      pointer-events: auto;
+    }
+
+    .auth-login-footer a,
+    .auth-login-footer .router-link-active {
+      position: relative;
+      z-index: 2;
+      pointer-events: auto;
+    }
+  }
+
+  /* Dashboard shell: avoid overflow:hidden + 100vh trap on mobile */
+  @media (max-width: 1023px) {
+    .shell {
+      overflow-x: clip;
+      overflow-y: auto;
+      min-height: 100svh;
+      min-height: 100dvh;
+    }
+
+    .main-shell {
+      height: auto;
+      min-height: 100svh;
+      min-height: 100dvh;
+      overflow: visible;
+    }
+
+    .page-content {
+      overflow-x: clip;
+      overflow-y: visible;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .topbar,
+    .theme-toggle,
+    .topbar-theme-toggle {
+      touch-action: manipulation;
+    }
+
+    .theme-toggle,
+    .topbar-theme-toggle {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
+    }
+
+    .sidebar {
+      touch-action: manipulation;
+    }
+
+    /* Belt-and-suspenders: closed off-canvas nav must never steal taps (Android WebView). */
+    .sidebar:not(.sidebar--mobile-open) {
+      pointer-events: none !important;
+    }
+
+    .sidebar--mobile-open {
+      pointer-events: auto;
+    }
+
+    .nav-item,
+    .nav-subitem,
+    .nav-group-trigger {
+      min-height: 2.75rem;
+    }
+
+    .mobile-close-btn,
+    .mobile-menu-btn {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
+    }
+
+    .mobile-backdrop {
+      touch-action: none;
+    }
+  }
+}
+
+body.mobile-menu-open {
+  /* Lock background scroll while drawer is open; removed when menu closes. */
+  overflow: hidden;
 }
 
 /* Safe areas for notched devices */

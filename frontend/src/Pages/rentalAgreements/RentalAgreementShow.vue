@@ -70,7 +70,15 @@
           Sync to invoice
         </ErpButton>
         <ErpButton
-          v-if="canApplyDeposit"
+          v-if="controls.can_record_deposit"
+          variant="secondary"
+          size="sm"
+          @click="openFinancialModal('security_deposit')"
+        >
+          Receive deposit
+        </ErpButton>
+        <ErpButton
+          v-if="controls.can_apply_deposit && unpaidInvoices.length"
           variant="secondary"
           size="sm"
           @click="openApplyDepositModal"
@@ -78,12 +86,20 @@
           Apply deposit
         </ErpButton>
         <ErpButton
-          v-if="unpaidInvoices.length"
+          v-if="controls.can_refund_deposit"
+          variant="secondary"
+          size="sm"
+          @click="openFinancialModal('deposit_refund')"
+        >
+          Refund deposit
+        </ErpButton>
+        <ErpButton
+          v-if="controls.can_record_payment && unpaidInvoices.length"
           variant="success"
           size="sm"
-          @click="openPaymentModal"
+          @click="openFinancialModal('rent')"
         >
-          Record payment
+          Record rent payment
         </ErpButton>
         <ErpButton
           v-if="controls.can_terminate"
@@ -115,8 +131,15 @@
             v-if="depositLedger"
             label="Deposit on hand"
             :value="formatMoney(depositLedger.available, currency)"
-            :caption="`Received ${formatMoney(depositLedger.received, currency)}`"
+            :caption="depositOnHandCaption"
             variant="accent"
+          />
+          <KpiCard
+            v-if="depositOutstanding > 0.009"
+            label="Deposit to collect"
+            :value="formatMoney(depositOutstanding, currency)"
+            caption="Contractual minus received"
+            variant="warning"
           />
           <KpiCard
             v-for="usage in billingSummary.utilityUsage"
@@ -229,23 +252,6 @@
                   />
                 </div>
               </dl>
-            </ErpPanel>
-
-            <ErpPanel
-              v-if="agreement.notes?.agreement_notes || agreement.notes?.special_terms"
-              title="Notes"
-              subtitle="Agreement and special terms"
-            >
-              <p v-if="agreement.notes?.agreement_notes" class="text-sm text-slate-700 whitespace-pre-wrap">
-                {{ agreement.notes.agreement_notes }}
-              </p>
-              <p
-                v-if="agreement.notes?.special_terms"
-                class="mt-3 text-sm text-slate-600 whitespace-pre-wrap border-t border-slate-100 pt-3"
-              >
-                <span class="font-medium text-slate-800">Special terms:</span>
-                {{ agreement.notes.special_terms }}
-              </p>
             </ErpPanel>
           </div>
 
@@ -507,16 +513,69 @@
           <textarea v-model="depositApplyForm.notes" rows="2" class="erp-input" placeholder="Optional" />
         </FormField>
       </div>
-      <div v-else-if="confirm.action === 'payment'" class="mt-3 max-h-48 space-y-2 overflow-y-auto">
-        <label
-          v-for="inv in unpaidInvoices"
-          :key="inv.id"
-          class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+      <div v-else-if="confirm.action === 'financial'" class="mt-3 space-y-4">
+        <FormField label="Transaction type" required>
+          <select v-model="financialForm.payment_purpose" class="erp-select">
+            <option value="rent">Rent (FIFO to open invoices)</option>
+            <option value="security_deposit">Security deposit received</option>
+            <option value="deposit_refund">Security deposit refund</option>
+          </select>
+        </FormField>
+        <p class="text-xs text-slate-500">{{ financialModalHint }}</p>
+        <div
+          v-if="financialForm.payment_purpose === 'rent'"
+          class="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm"
         >
-          <input v-model="paymentSelection" type="checkbox" class="rounded border-slate-300" :value="inv.id" />
-          <span class="font-mono text-xs">{{ inv.invoice_number }}</span>
-          <span class="ml-auto tabular-nums text-red-700">{{ formatMoney(inv.balance_due, currency) }}</span>
-        </label>
+          <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Outstanding on this lease</p>
+          <p class="text-lg font-semibold tabular-nums text-slate-900">
+            {{ formatMoney(outstandingBalance, currency) }}
+          </p>
+          <p class="text-xs text-slate-500">Allocated oldest invoice first (FIFO)</p>
+        </div>
+        <div
+          v-else
+          class="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-700"
+        >
+          <p v-if="financialForm.payment_purpose === 'security_deposit'">
+            Required {{ formatMoney(depositLedger?.required, currency) }}
+            · received {{ formatMoney(depositLedger?.received, currency) }}
+            <span v-if="depositOutstanding > 0.009">
+              · still to collect {{ formatMoney(depositOutstanding, currency) }}
+            </span>
+          </p>
+          <p v-else>
+            Available to refund:
+            <span class="font-semibold tabular-nums">{{ formatMoney(depositLedger?.available, currency) }}</span>
+          </p>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <FormField label="Amount" required>
+            <input
+              v-model="financialForm.amount"
+              type="number"
+              step="0.01"
+              min="0.01"
+              class="erp-input tabular-nums"
+            />
+          </FormField>
+          <FormField label="Payment date" required>
+            <input v-model="financialForm.payment_date" type="date" class="erp-input" />
+          </FormField>
+        </div>
+        <FormField label="Payment method" required>
+          <select v-model="financialForm.payment_method" class="erp-select">
+            <option value="bank_transfer">Bank transfer</option>
+            <option value="cash">Cash</option>
+            <option value="mobile_money">Mobile money</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </FormField>
+        <FormField label="Reference">
+          <input v-model="financialForm.reference_number" type="text" class="erp-input" placeholder="Transfer ref, cheque #…" />
+        </FormField>
+        <FormField label="Notes">
+          <textarea v-model="financialForm.notes" rows="2" class="erp-input" placeholder="Optional" />
+        </FormField>
       </div>
     </ErpModal>
   </div>
@@ -527,6 +586,7 @@ import { ref, reactive, computed, watch, onMounted, defineComponent, h } from 'v
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useRentalAgreements } from '@/composables/useRentalAgreements'
+import { usePayments } from '@/composables/usePayments'
 import { buildBillingSummary } from '@/utils/rentalAgreementBilling'
 import { tenantDisplayName } from '@/utils/tenantDisplayName'
 import { compactActions } from '@/composables/useTableActions'
@@ -563,6 +623,7 @@ const DetailField = defineComponent({
 const route = useRoute()
 const router = useRouter()
 const { fetchOne, approve, activate, terminate, remove } = useRentalAgreements()
+const { recordPayment, saving: paymentSaving } = usePayments()
 
 const loading = ref(true)
 const invoicesLoading = ref(false)
@@ -611,7 +672,14 @@ const generateForm = reactive({
   month: new Date().getMonth() + 1,
 })
 
-const paymentSelection = ref([])
+const financialForm = reactive({
+  payment_purpose: 'rent',
+  amount: '',
+  payment_date: new Date().toISOString().split('T')[0],
+  payment_method: 'bank_transfer',
+  reference_number: '',
+  notes: '',
+})
 
 const depositApplyForm = reactive({
   monthly_invoice_id: '',
@@ -627,11 +695,15 @@ const billingYears = computed(() => {
 const controls = computed(() => agreement.value?.controls || {})
 const currency = computed(() => agreement.value?.financials?.currency || 'USD')
 const depositLedger = computed(() => agreement.value?.financials?.deposit_ledger ?? null)
-const depositLedgerCaption = computed(() => {
+const depositOutstanding = computed(() => {
   const ledger = depositLedger.value
-  if (!ledger || ledger.received <= 0) {
-    return 'Contractual amount at lease start'
-  }
+  if (!ledger) return 0
+  return Math.max(0, Number(ledger.required ?? 0) - Number(ledger.received ?? 0))
+})
+
+const depositOnHandCaption = computed(() => {
+  const ledger = depositLedger.value
+  if (!ledger) return ''
   const parts = [`Received ${formatMoney(ledger.received, currency.value)}`]
   if (ledger.applied > 0) {
     parts.push(`applied ${formatMoney(ledger.applied, currency.value)}`)
@@ -640,6 +712,27 @@ const depositLedgerCaption = computed(() => {
     parts.push(`refunded ${formatMoney(ledger.refunded, currency.value)}`)
   }
   return parts.join(' · ')
+})
+
+const depositLedgerCaption = computed(() => {
+  const ledger = depositLedger.value
+  if (!ledger || ledger.received <= 0) {
+    if (depositOutstanding.value > 0.009) {
+      return `Collect ${formatMoney(depositOutstanding.value, currency.value)}`
+    }
+    return 'Contractual amount at lease start'
+  }
+  return depositOnHandCaption.value
+})
+
+const financialModalHint = computed(() => {
+  if (financialForm.payment_purpose === 'security_deposit') {
+    return 'Posts to customer deposits liability (2120). Does not reduce rent invoices.'
+  }
+  if (financialForm.payment_purpose === 'deposit_refund') {
+    return 'Releases deposit liability (2120) back to the receipt account.'
+  }
+  return 'Payment is allocated to this tenant’s oldest open invoices (FIFO).'
 })
 
 const breadcrumbs = computed(() => [
@@ -709,13 +802,6 @@ const outstandingBalance = computed(() =>
 const unpaidInvoices = computed(() =>
   invoices.value.filter((inv) => Number(inv.balance_due) > 0 && inv.status !== 'paid')
 )
-
-const canApplyDeposit = computed(() => {
-  const available = Number(depositLedger.value?.available ?? 0)
-  return available > 0.009
-    && unpaidInvoices.value.length > 0
-    && agreement.value?.status?.value === 'active'
-})
 
 const selectedApplyInvoice = computed(() =>
   unpaidInvoices.value.find((inv) => inv.id === depositApplyForm.monthly_invoice_id) ?? null,
@@ -880,15 +966,56 @@ function openApplyDepositModal() {
   confirm.open = true
 }
 
-function openPaymentModal() {
-  paymentSelection.value = unpaidInvoices.value.map((i) => i.id)
-  confirm.action = 'payment'
-  confirm.title = 'Record payment'
-  confirm.subtitle = 'Mark selected invoices as paid.'
-  confirm.confirmLabel = 'Mark paid'
-  confirm.variant = 'success'
+function suggestedFinancialAmount(purpose) {
+  if (purpose === 'rent') {
+    const balance = outstandingBalance.value
+    return balance > 0 ? balance.toFixed(2) : ''
+  }
+  if (purpose === 'security_deposit') {
+    return depositOutstanding.value > 0.009 ? depositOutstanding.value.toFixed(2) : ''
+  }
+  if (purpose === 'deposit_refund') {
+    const available = Number(depositLedger.value?.available ?? 0)
+    return available > 0.009 ? available.toFixed(2) : ''
+  }
+  return ''
+}
+
+function openFinancialModal(purpose = 'rent', amount = '') {
+  financialForm.payment_purpose = purpose
+  financialForm.payment_date = new Date().toISOString().split('T')[0]
+  financialForm.payment_method = 'bank_transfer'
+  financialForm.reference_number = ''
+  financialForm.notes = ''
+  financialForm.amount = amount || suggestedFinancialAmount(purpose)
+  confirm.action = 'financial'
+  confirm.title = purpose === 'deposit_refund'
+    ? 'Refund security deposit'
+    : purpose === 'security_deposit'
+      ? 'Receive security deposit'
+      : 'Record rent payment'
+  confirm.subtitle = financialModalHint.value
+  confirm.confirmLabel = purpose === 'deposit_refund' ? 'Refund deposit' : 'Record payment'
+  confirm.variant = purpose === 'deposit_refund' ? 'danger' : 'success'
   confirm.open = true
 }
+
+watch(
+  () => financialForm.payment_purpose,
+  (purpose) => {
+    if (confirm.action === 'financial') {
+      financialForm.amount = suggestedFinancialAmount(purpose)
+      confirm.title = purpose === 'deposit_refund'
+        ? 'Refund security deposit'
+        : purpose === 'security_deposit'
+          ? 'Receive security deposit'
+          : 'Record rent payment'
+      confirm.subtitle = financialModalHint.value
+      confirm.confirmLabel = purpose === 'deposit_refund' ? 'Refund deposit' : 'Record payment'
+      confirm.variant = purpose === 'deposit_refund' ? 'danger' : 'success'
+    }
+  },
+)
 
 watch(
   () => depositApplyForm.monthly_invoice_id,
@@ -913,8 +1040,18 @@ async function runConfirm() {
       return
     }
   }
-  if (confirm.action === 'payment' && !paymentSelection.value.length) {
-    return
+  if (confirm.action === 'financial') {
+    if (!financialForm.amount || Number(financialForm.amount) <= 0) {
+      pageError.value = 'Enter a valid amount.'
+      return
+    }
+    if (financialForm.payment_purpose === 'deposit_refund') {
+      const available = Number(depositLedger.value?.available ?? 0)
+      if (Number(financialForm.amount) > available + 0.009) {
+        pageError.value = 'Refund amount exceeds available deposit balance.'
+        return
+      }
+    }
   }
 
   confirm.loading = true
@@ -953,11 +1090,25 @@ async function runConfirm() {
       pageSuccess.value = data.message || 'Deposit applied to invoice.'
       confirm.open = false
       await refreshAll()
-    } else if (confirm.action === 'payment') {
-      await api.post('/invoices/bulk-mark-paid', { ids: paymentSelection.value })
-      pageSuccess.value = 'Payment recorded.'
+    } else if (confirm.action === 'financial') {
+      const tenantId = agreement.value?.tenant?.id
+      if (!tenantId) {
+        pageError.value = 'Tenant is required to record a payment.'
+        return
+      }
+      const { message } = await recordPayment({
+        tenant_id: tenantId,
+        agreement_id: agreement.value.id,
+        payment_purpose: financialForm.payment_purpose,
+        amount: Number(financialForm.amount),
+        payment_date: financialForm.payment_date,
+        payment_method: financialForm.payment_method,
+        reference_number: financialForm.reference_number || undefined,
+        notes: financialForm.notes || undefined,
+      })
+      pageSuccess.value = message || 'Payment recorded.'
       confirm.open = false
-      await loadInvoices()
+      await refreshAll()
     }
   } catch (err) {
     pageError.value = err.response?.data?.message || 'Action failed.'
@@ -1011,11 +1162,11 @@ function invoiceActions(row) {
       variant: 'primary',
       onClick: () => finalizeInvoice(row),
     },
-    Number(row.balance_due) > 0 && row.status !== 'paid' && {
+    Number(row.balance_due) > 0 && row.status !== 'paid' && controls.value.can_record_payment && {
       key: 'pay',
-      label: 'Mark paid',
+      label: 'Record payment',
       variant: 'success',
-      onClick: () => markInvoicesPaid([row.id]),
+      onClick: () => openFinancialModal('rent', Number(row.balance_due).toFixed(2)),
     },
   ])
 }
@@ -1045,17 +1196,6 @@ async function finalizeInvoice(row) {
     await loadInvoices()
   } catch (err) {
     pageError.value = err.response?.data?.message || 'Could not finalize invoice.'
-  }
-}
-
-async function markInvoicesPaid(ids) {
-  pageError.value = ''
-  try {
-    await api.post('/invoices/bulk-mark-paid', { ids })
-    pageSuccess.value = 'Payment recorded.'
-    await loadInvoices()
-  } catch (err) {
-    pageError.value = err.response?.data?.message || 'Could not record payment.'
   }
 }
 

@@ -63,7 +63,6 @@ class RentalAgreementService
                 'signed_at' => $data['signed_at'] ?? null,
                 'contract_amount' => $data['contract_amount'] ?? $data['monthly_rent'],
                 'currency' => strtoupper($data['currency'] ?? 'USD'),
-                'notes' => $data['notes'] ?? null,
                 'created_by' => $actor->id,
             ]);
 
@@ -83,7 +82,6 @@ class RentalAgreementService
                 'includes_internet' => (bool) ($data['includes_internet'] ?? false),
                 'auto_renew' => (bool) ($data['auto_renew'] ?? false),
                 'renewal_notice_days' => $data['renewal_notice_days'] ?? 30,
-                'special_terms' => $data['special_terms'] ?? null,
             ]);
 
             if ($status === Agreement::STATUS_ACTIVE) {
@@ -209,7 +207,6 @@ class RentalAgreementService
                 'signed_at' => $data['signed_at'] ?? null,
                 'contract_amount' => $data['contract_amount'] ?? null,
                 'currency' => isset($data['currency']) ? strtoupper($data['currency']) : null,
-                'notes' => $data['notes'] ?? null,
                 'updated_by' => $actor->id,
             ], fn ($v) => $v !== null);
 
@@ -230,7 +227,6 @@ class RentalAgreementService
                 'includes_internet' => array_key_exists('includes_internet', $data) ? (bool) $data['includes_internet'] : null,
                 'auto_renew' => array_key_exists('auto_renew', $data) ? (bool) $data['auto_renew'] : null,
                 'renewal_notice_days' => $data['renewal_notice_days'] ?? null,
-                'special_terms' => $data['special_terms'] ?? null,
             ], fn ($v) => $v !== null);
 
             if ($rentalPayload !== []) {

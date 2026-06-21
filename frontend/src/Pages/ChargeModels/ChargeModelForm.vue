@@ -1,5 +1,5 @@
 <template>
-  <form class="space-y-5" @submit.prevent="submit">
+  <component :is="transactional ? 'div' : 'form'" class="space-y-5" v-bind="transactional ? {} : { onSubmit: (e) => { e.preventDefault(); submit() } }">
     <FormSection compact title="Core details">
       <FormGrid>
         <FormField label="Name" required :error="firstError(errors.name)">
@@ -171,13 +171,16 @@
       </div>
     </FormSection>
 
-    <footer class="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+    <footer
+      v-if="!transactional"
+      class="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end"
+    >
       <ErpButton type="button" variant="secondary" @click="$emit('cancel')">Cancel</ErpButton>
       <ErpButton type="submit" variant="primary" :loading="submitting" :disabled="submitting">
         {{ submitting ? 'Saving…' : submitLabel }}
       </ErpButton>
     </footer>
-  </form>
+  </component>
 </template>
 
 <script setup>
@@ -211,6 +214,7 @@ const props = defineProps({
   errors: { type: Object, default: () => ({}) },
   submitting: { type: Boolean, default: false },
   submitLabel: { type: String, default: 'Save Charge Model' },
+  transactional: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:modelValue', 'submit', 'cancel'])

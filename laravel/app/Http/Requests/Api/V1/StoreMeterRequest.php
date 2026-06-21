@@ -16,9 +16,9 @@ class StoreMeterRequest extends FormRequest
      * to make this request.
      */
     public function authorize(): bool
-{
-    return $this->user() !== null;
-}
+    {
+        return $this->user()?->can('create', Meter::class) ?? false;
+    }
 
     /**
      * Validation Rules

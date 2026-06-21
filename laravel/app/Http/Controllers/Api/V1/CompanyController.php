@@ -47,6 +47,8 @@ class CompanyController extends Controller
         StoreCompanyRequest $request
     ): JsonResponse
     {
+        $this->authorize('create', Company::class);
+
         $data = $request->validated();
 
         // Handle Logo Upload

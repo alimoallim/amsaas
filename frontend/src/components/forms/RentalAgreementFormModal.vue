@@ -62,8 +62,6 @@ const emptyForm = () => ({
   status: 'draft',
   rent_charge_model_id: '',
   recurring_charges: [],
-  notes: '',
-  special_terms: '',
 })
 
 const form = reactive(emptyForm())
@@ -103,8 +101,6 @@ async function load() {
         security_deposit: item.financials?.security_deposit ?? '',
         auto_renew: item.renewal?.auto_renew ?? false,
         renewal_notice_days: item.renewal?.renewal_notice_days ?? 30,
-        notes: item.notes?.agreement_notes ?? '',
-        special_terms: item.notes?.special_terms ?? '',
         ...mapBillingFromApi(item.billing),
       })
     } else {

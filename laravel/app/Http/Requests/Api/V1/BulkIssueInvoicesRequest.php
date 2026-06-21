@@ -2,13 +2,14 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\MonthlyInvoice;
 use Illuminate\Foundation\Http\FormRequest;
 
 class BulkIssueInvoicesRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('bulkManage', MonthlyInvoice::class) ?? false;
     }
 
     /**

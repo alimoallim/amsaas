@@ -10,6 +10,7 @@ use App\Http\Requests\Api\V1\UpdateRentalAgreementRequest;
 use App\Http\Resources\Api\V1\MonthlyInvoiceResource;
 use App\Http\Resources\Api\V1\RentalAgreementResource;
 use App\Models\RentalAgreement;
+use App\Models\User;
 use App\Services\Billing\ConsolidationResult;
 use App\Services\Billing\InvoiceConsolidationService;
 use App\Services\Property\RentalAgreementService;
@@ -17,18 +18,23 @@ use App\Services\RentalDepositService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Throwable;
 
 class RentalAgreementController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __construct(
         private readonly RentalAgreementService $rentalAgreements,
     ) {}
 
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', RentalAgreement::class);
+
         $agreements = RentalAgreement::query()
             ->with([
                 'agreement.apartment.building',
@@ -37,6 +43,16 @@ class RentalAgreementController extends Controller
             ->whereHas(
                 'agreement',
                 fn ($query) => $query->where('company_id', $request->user()->company_id)
+            )
+            ->when(
+                $request->filled('tenant_id'),
+                fn ($query) => $query->whereHas(
+                    'agreement',
+                    fn ($agreementQuery) => $agreementQuery->where(
+                        'tenant_id',
+                        $request->string('tenant_id')
+                    )
+                )
             )
             ->latest()
             ->paginate($request->integer('per_page', 100));
@@ -56,6 +72,8 @@ class RentalAgreementController extends Controller
 
     public function store(StoreRentalAgreementRequest $request): JsonResponse
     {
+        $this->authorize('create', RentalAgreement::class);
+
         try {
             $rental = $this->rentalAgreements->create(
                 $request->user(),
@@ -93,20 +111,12 @@ class RentalAgreementController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $rentalAgreement = RentalAgreement::query()
-            ->with([
-                'agreement.apartment.building',
-                'agreement.tenant',
-                'agreement.agreementCharges.chargeModel',
-                'agreement.agreementCharges.chargeType',
-            ])
-            ->whereHas(
-                'agreement',
-                fn ($query) => $query
-                    ->where('company_id', $request->user()->company_id)
-                    ->where('id', $id)
-            )
-            ->first();
+        $rentalAgreement = $this->findRentalAgreement($request->user(), $id, [
+            'agreement.apartment.building',
+            'agreement.tenant',
+            'agreement.agreementCharges.chargeModel',
+            'agreement.agreementCharges.chargeType',
+        ]);
 
         if (! $rentalAgreement) {
             return response()->json([
@@ -114,6 +124,8 @@ class RentalAgreementController extends Controller
                 'message' => 'Rental agreement not found.',
             ], 404);
         }
+
+        $this->authorize('view', $rentalAgreement);
 
         return response()->json([
             'success' => true,
@@ -126,14 +138,7 @@ class RentalAgreementController extends Controller
         string $id,
         RentalDepositService $deposits,
     ): JsonResponse {
-        $rentalAgreement = RentalAgreement::query()
-            ->whereHas(
-                'agreement',
-                fn ($query) => $query
-                    ->where('company_id', $request->user()->company_id)
-                    ->where('id', $id)
-            )
-            ->first();
+        $rentalAgreement = $this->findRentalAgreement($request->user(), $id);
 
         if (! $rentalAgreement) {
             return response()->json([
@@ -141,6 +146,8 @@ class RentalAgreementController extends Controller
                 'message' => 'Rental agreement not found.',
             ], 404);
         }
+
+        $this->authorize('applyDeposit', $rentalAgreement);
 
         $application = $deposits->applyToInvoice(
             $request->user(),
@@ -167,6 +174,11 @@ class RentalAgreementController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
+        $rentalAgreement = $this->findRentalAgreement($request->user(), $id);
+        if ($rentalAgreement) {
+            $this->authorize('delete', $rentalAgreement);
+        }
+
         try {
             $this->rentalAgreements->delete($request->user(), $id);
 
@@ -191,6 +203,11 @@ class RentalAgreementController extends Controller
 
     public function approve(Request $request, string $id): JsonResponse
     {
+        $rentalAgreement = $this->findRentalAgreement($request->user(), $id);
+        if ($rentalAgreement) {
+            $this->authorize('update', $rentalAgreement);
+        }
+
         try {
             $rental = $this->rentalAgreements->approve($request->user(), $id);
 
@@ -217,6 +234,11 @@ class RentalAgreementController extends Controller
 
     public function activate(Request $request, string $id): JsonResponse
     {
+        $rentalAgreement = $this->findRentalAgreement($request->user(), $id);
+        if ($rentalAgreement) {
+            $this->authorize('update', $rentalAgreement);
+        }
+
         try {
             $rental = $this->rentalAgreements->activate($request->user(), $id);
 
@@ -246,6 +268,11 @@ class RentalAgreementController extends Controller
         $request->validate([
             'termination_reason' => ['required', 'string', 'max:5000'],
         ]);
+
+        $rentalAgreement = $this->findRentalAgreement($request->user(), $id);
+        if ($rentalAgreement) {
+            $this->authorize('update', $rentalAgreement);
+        }
 
         try {
             $rental = $this->rentalAgreements->terminate(
@@ -282,15 +309,7 @@ class RentalAgreementController extends Controller
             'month' => 'required|integer|between:1,12',
         ]);
 
-        $rental = RentalAgreement::query()
-            ->with(['agreement.apartment'])
-            ->whereHas(
-                'agreement',
-                fn ($query) => $query
-                    ->where('company_id', $request->user()->company_id)
-                    ->where('id', $id)
-            )
-            ->first();
+        $rental = $this->findRentalAgreement($request->user(), $id, ['agreement.apartment']);
 
         if (! $rental) {
             return response()->json([
@@ -298,6 +317,8 @@ class RentalAgreementController extends Controller
                 'message' => 'Rental agreement not found.',
             ], 404);
         }
+
+        $this->authorize('consolidateBilling', $rental);
 
         $billingDate = Carbon::create(
             (int) $validated['year'],
@@ -345,6 +366,11 @@ class RentalAgreementController extends Controller
 
     public function update(UpdateRentalAgreementRequest $request, string $id): JsonResponse
     {
+        $rentalAgreement = $this->findRentalAgreement($request->user(), $id);
+        if ($rentalAgreement) {
+            $this->authorize('update', $rentalAgreement);
+        }
+
         try {
             $rental = $this->rentalAgreements->update(
                 $request->user(),
@@ -377,5 +403,21 @@ class RentalAgreementController extends Controller
                 'error' => app()->environment('local') ? $exception->getMessage() : null,
             ], 500);
         }
+    }
+
+    /**
+     * @param  list<string>  $with
+     */
+    protected function findRentalAgreement(User $user, string $id, array $with = []): ?RentalAgreement
+    {
+        return RentalAgreement::query()
+            ->when($with !== [], fn ($query) => $query->with($with))
+            ->whereHas(
+                'agreement',
+                fn ($query) => $query
+                    ->where('company_id', $user->company_id)
+                    ->where('id', $id)
+            )
+            ->first();
     }
 }

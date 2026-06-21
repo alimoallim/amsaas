@@ -76,6 +76,179 @@ class JournalEntryService
         );
     }
 
+    public function postInvoiceCreditNote(MonthlyInvoice $invoice, ?string $userId = null): ?JournalEntry
+    {
+        $invoice->loadMissing(['company', 'lineItems.chargeType']);
+
+        $existing = $this->findBySource(
+            $invoice->company_id,
+            JournalEntry::SOURCE_INVOICE_CREDIT_NOTE,
+            $invoice->id,
+        );
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $issueEntry = $this->findBySource(
+            $invoice->company_id,
+            JournalEntry::SOURCE_INVOICE_ISSUED,
+            $invoice->id,
+        );
+
+        if (! $issueEntry) {
+            return null;
+        }
+
+        $total = Money::toScale((string) ($invoice->total_amount ?? '0'));
+
+        if (Money::comp($total, '0') <= 0) {
+            return null;
+        }
+
+        $debitLines = $this->normalizeCreditLines(
+            $this->postingRules->invoiceCreditLines($invoice),
+            $total,
+            $invoice->contract_type === 'sale'
+                ? Account::CODE_SALE_INCOME
+                : Account::CODE_RENTAL_INCOME,
+            $invoice->invoice_number,
+        );
+
+        foreach ($debitLines as &$line) {
+            $line['debit'] = $line['credit'];
+            unset($line['credit']);
+            $line['description'] = 'Credit note reversal — '.$invoice->invoice_number;
+        }
+        unset($line);
+
+        $entryDate = now()->toDateString();
+
+        return $this->postBalancedEntry(
+            companyId: $invoice->company_id,
+            description: 'Invoice credit note — '.$invoice->invoice_number,
+            entryDate: $entryDate,
+            postingDate: $entryDate,
+            sourceType: JournalEntry::SOURCE_INVOICE_CREDIT_NOTE,
+            sourceId: $invoice->id,
+            fiscalYear: (int) now()->format('Y'),
+            fiscalMonth: (int) now()->format('n'),
+            currencyCode: $invoice->company?->currency_code ?? 'USD',
+            debitLines: $debitLines,
+            creditLines: [[
+                'account_code' => Account::CODE_ACCOUNTS_RECEIVABLE,
+                'credit' => $total,
+                'description' => 'AR reversal — '.$invoice->invoice_number,
+            ]],
+            userId: $userId,
+        );
+    }
+
+    public function postPaymentAllocationReversal(PaymentAllocation $allocation, ?string $userId = null): ?JournalEntry
+    {
+        $allocation->loadMissing(['payment', 'monthlyInvoice.company']);
+
+        $payment = $allocation->payment;
+        $invoice = $allocation->monthlyInvoice;
+
+        if (! $payment || ! $invoice) {
+            return null;
+        }
+
+        $existing = $this->findBySource(
+            $payment->company_id,
+            JournalEntry::SOURCE_PAYMENT_ALLOCATION_REVERSAL,
+            $allocation->id,
+        );
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $amount = Money::toScale((string) $allocation->amount_allocated);
+
+        if (Money::comp($amount, '0') <= 0) {
+            return null;
+        }
+
+        $entryDate = now()->toDateString();
+
+        return $this->postBalancedEntry(
+            companyId: $payment->company_id,
+            description: 'Payment refund — '.$payment->receipt_number,
+            entryDate: $entryDate,
+            postingDate: $entryDate,
+            sourceType: JournalEntry::SOURCE_PAYMENT_ALLOCATION_REVERSAL,
+            sourceId: $allocation->id,
+            fiscalYear: (int) now()->format('Y'),
+            fiscalMonth: (int) now()->format('n'),
+            currencyCode: $invoice->company?->currency_code ?? 'USD',
+            debitLines: [[
+                'account_code' => $this->postingRules->accountsReceivableCode(),
+                'debit' => $amount,
+                'description' => 'AR restored — '.$invoice->invoice_number,
+            ]],
+            creditLines: [[
+                'account_code' => $this->postingRules->resolveReceiptAccountCode($payment),
+                'credit' => $amount,
+                'description' => 'Payment refund — '.$payment->receipt_number,
+            ]],
+            userId: $userId ?? $payment->recorded_by,
+        );
+    }
+
+    public function postPaymentUnallocatedRefund(
+        Payment $payment,
+        string $amount,
+        ?string $userId = null,
+        ?string $sourceId = null,
+    ): ?JournalEntry {
+        $payment->loadMissing('company');
+
+        $sourceId ??= (string) Str::uuid();
+
+        $existing = $this->findBySource(
+            $payment->company_id,
+            JournalEntry::SOURCE_PAYMENT_REFUND,
+            $sourceId,
+        );
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $scaled = Money::toScale($amount);
+
+        if (Money::comp($scaled, '0') <= 0) {
+            return null;
+        }
+
+        $entryDate = now()->toDateString();
+
+        return $this->postBalancedEntry(
+            companyId: $payment->company_id,
+            description: 'Unallocated payment refund — '.$payment->receipt_number,
+            entryDate: $entryDate,
+            postingDate: $entryDate,
+            sourceType: JournalEntry::SOURCE_PAYMENT_REFUND,
+            sourceId: $sourceId,
+            fiscalYear: (int) now()->format('Y'),
+            fiscalMonth: (int) now()->format('n'),
+            currencyCode: $payment->company?->currency_code ?? 'USD',
+            debitLines: [[
+                'account_code' => $this->postingRules->customerDepositsCode(),
+                'debit' => $scaled,
+                'description' => 'Tenant credit released — '.$payment->receipt_number,
+            ]],
+            creditLines: [[
+                'account_code' => $this->postingRules->resolveReceiptAccountCode($payment),
+                'credit' => $scaled,
+                'description' => 'Payment refund — '.$payment->receipt_number,
+            ]],
+            userId: $userId ?? $payment->recorded_by,
+        );
+    }
+
     public function postPaymentAllocation(PaymentAllocation $allocation, ?string $userId = null): ?JournalEntry
     {
         $allocation->loadMissing(['payment', 'monthlyInvoice.company']);
@@ -456,6 +629,18 @@ class JournalEntryService
                     $inner->where('source_type', JournalEntry::SOURCE_RENTAL_DEPOSIT_REFUND)
                         ->where('source_id', $payment->id);
                 });
+
+                $query->orWhere(function ($inner) use ($payment) {
+                    $inner->where('source_type', JournalEntry::SOURCE_PAYMENT_REFUND)
+                        ->where('source_id', $payment->id);
+                });
+
+                if ($allocationIds->isNotEmpty()) {
+                    $query->orWhere(function ($inner) use ($allocationIds) {
+                        $inner->where('source_type', JournalEntry::SOURCE_PAYMENT_ALLOCATION_REVERSAL)
+                            ->whereIn('source_id', $allocationIds);
+                    });
+                }
             })
             ->with(['lines.account'])
             ->orderBy('entry_date')

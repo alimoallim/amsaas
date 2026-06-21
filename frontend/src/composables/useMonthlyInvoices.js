@@ -96,16 +96,35 @@ export function useMonthlyInvoices() {
     return data.data ?? data
   }
 
+  async function creditNoteInvoice(id, reason) {
+    const { data } = await api.post(`/invoices/${id}/credit-note`, { reason })
+    return data.data ?? data
+  }
+
   async function downloadPdf(id, filename = 'invoice') {
-    const response = await api.get(`/invoices/${id}/download`, { responseType: 'blob' })
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `${filename}.pdf`)
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.URL.revokeObjectURL(url)
+    try {
+      const response = await api.get(`/invoices/${id}/download`, { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `${filename}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (e) {
+      const blob = e.response?.data
+      if (blob instanceof Blob && blob.type?.includes('json')) {
+        const text = await blob.text()
+        try {
+          const parsed = JSON.parse(text)
+          e.response.data = parsed
+        } catch {
+          /* keep blob */
+        }
+      }
+      throw e
+    }
   }
 
   /**
@@ -146,6 +165,7 @@ export function useMonthlyInvoices() {
     createInvoice,
     issueOne,
     voidInvoice,
+    creditNoteInvoice,
     downloadPdf,
     bulkIssue,
   }

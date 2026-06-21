@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('sale_reservations', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('company_id')->constrained('companies')->cascadeOnDelete();
             $table->string('reservation_number', 50);
             $table->foreignUuid('apartment_id')->constrained('apartments')->cascadeOnDelete();

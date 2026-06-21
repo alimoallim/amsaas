@@ -27,16 +27,19 @@ class AgingReceivablesTest extends TestCase
 
         $this->createOpenInvoice($user->company_id, $apartment->id, $agreement->id, [
             'invoice_number' => 'INV-CURRENT',
+            'billing_month' => 6,
             'due_date' => '2026-06-20',
             'subtotal_rent' => 100,
         ]);
         $this->createOpenInvoice($user->company_id, $apartment->id, $agreement->id, [
             'invoice_number' => 'INV-30',
+            'billing_month' => 5,
             'due_date' => '2026-06-01',
             'subtotal_rent' => 200,
         ]);
         $this->createOpenInvoice($user->company_id, $apartment->id, $agreement->id, [
             'invoice_number' => 'INV-90PLUS',
+            'billing_month' => 2,
             'due_date' => '2026-02-01',
             'subtotal_rent' => 300,
         ]);
@@ -63,11 +66,13 @@ class AgingReceivablesTest extends TestCase
 
         $this->createOpenInvoice($user->company_id, $apartment->id, $agreement->id, [
             'invoice_number' => 'INV-A',
+            'billing_month' => 6,
             'due_date' => '2026-06-01',
             'subtotal_rent' => 150,
         ]);
         $this->createOpenInvoice($user->company_id, $apartment->id, $agreement->id, [
             'invoice_number' => 'INV-B',
+            'billing_month' => 5,
             'due_date' => '2026-05-01',
             'subtotal_rent' => 250,
         ]);
@@ -100,7 +105,10 @@ class AgingReceivablesTest extends TestCase
 
         $response->assertOk();
         $this->assertStringContainsString('text/csv', (string) $response->headers->get('Content-Type'));
-        $this->assertStringContainsString('INV-CSV-001', $response->getContent());
+        $content = method_exists($response, 'streamedContent')
+            ? $response->streamedContent()
+            : $response->getContent();
+        $this->assertStringContainsString('INV-CSV-001', $content);
     }
 
     public function test_bucket_for_due_date_boundaries(): void
@@ -118,7 +126,7 @@ class AgingReceivablesTest extends TestCase
         );
         $this->assertSame(
             AgingReceivablesService::BUCKET_DAYS_31_60,
-            $service->bucketForDueDate(Carbon::parse('2026-04-15'), $asOf)
+            $service->bucketForDueDate(Carbon::parse('2026-04-16'), $asOf)
         );
         $this->assertSame(
             AgingReceivablesService::BUCKET_DAYS_OVER_90,

@@ -9,7 +9,7 @@
       <ErpButton variant="ghost" size="sm" :loading="loading" @click="fetchList(meta?.current_page || 1)">
         Refresh
       </ErpButton>
-      <ErpButton @click="formModal.openCreate()">Add account</ErpButton>
+      <ErpButton :to="{ name: 'AccountCreate' }">Add account</ErpButton>
     </template>
 
     <template #filters>
@@ -49,7 +49,7 @@
         @row-click="onRowClick"
       >
         <template #emptyAction>
-          <ErpButton @click="formModal.openCreate()">Add account</ErpButton>
+          <ErpButton :to="{ name: 'AccountCreate' }">Add account</ErpButton>
         </template>
 
         <template #cell-code="{ row }">
@@ -76,12 +76,6 @@
     </template>
   </WorklistLayout>
 
-  <AccountFormModal
-    :open="formModal.state.open"
-    :entity-id="formModal.state.id"
-    @close="formModal.close()"
-    @saved="fetchList(meta?.current_page || 1)"
-  />
 </template>
 
 <script setup>
@@ -89,10 +83,8 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAccounts } from '@/composables/useAccounts'
 import { useSmartFilters } from '@/composables/useSmartFilters'
-import { useFormModal } from '@/composables/useFormModal'
 import { useConfirm } from '@/composables/useConfirm'
 import { compactActions, editAction, deleteAction } from '@/composables/useTableActions'
-import AccountFormModal from '@/components/forms/AccountFormModal.vue'
 import {
   WorklistLayout,
   ErpButton,
@@ -106,7 +98,6 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const formModal = useFormModal()
 const { confirm } = useConfirm()
 const serverError = ref('')
 
@@ -156,13 +147,13 @@ function accountActions(row) {
       label: 'View ledger',
       onClick: () => router.push({ name: 'GeneralLedger', query: { account_id: row.id } }),
     },
-    editAction(() => formModal.openEdit(row.id)),
+    editAction(() => router.push({ name: 'AccountEdit', params: { id: row.id } })),
     row.controls?.can_delete && deleteAction(() => onDelete(row)),
   ])
 }
 
 function onRowClick(row) {
-  formModal.openEdit(row.id)
+  router.push({ name: 'AccountEdit', params: { id: row.id } })
 }
 
 async function onDelete(row) {
@@ -205,7 +196,6 @@ function onClearAll() {
 
 onMounted(() => {
   bindRoute(route, router, { debounceMs: 300 })
-  formModal.syncFromRoute(route, router)
   fetchList()
 })
 </script>

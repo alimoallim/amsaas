@@ -13,6 +13,7 @@ use App\Services\MeterReading\BulkMeterReadingService;
 use App\Services\MeterReading\MeterReadingEntryGridService;
 use App\Services\MeterReading\MeterReadingProcessorService;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -20,6 +21,8 @@ use Illuminate\Validation\ValidationException;
 
 class MeterReadingController extends Controller
 {
+    use AuthorizesRequests;
+
     /*
     |--------------------------------------------------------------------------
     | Index
@@ -29,6 +32,7 @@ class MeterReadingController extends Controller
     public function index(
         Request $request
     ): JsonResponse {
+        $this->authorize('viewAny', MeterReading::class);
 
         $readings = MeterReading::query()
 
@@ -244,6 +248,7 @@ class MeterReadingController extends Controller
     public function store(
         Request $request
     ): JsonResponse {
+        $this->authorize('create', MeterReading::class);
 
         $validated =
             $request->validate([
@@ -346,10 +351,7 @@ class MeterReadingController extends Controller
         Request $request,
         MeterReading $meterReading
     ): JsonResponse {
-        abort_unless(
-            $meterReading->company_id === $request->user()->company_id,
-            404
-        );
+        $this->authorize('update', $meterReading);
 
         $validated = $request->validate([
             'meter_id' => ['sometimes', 'uuid', 'exists:meters,id'],
@@ -399,17 +401,7 @@ class MeterReadingController extends Controller
         Request $request,
         MeterReading $meterReading
     ): JsonResponse {
-
-        abort_unless(
-
-            $meterReading->company_id
-            ===
-            $request
-                ->user()
-                ->company_id,
-
-            404
-        );
+        $this->authorize('view', $meterReading);
 
         $meterReading->load([
 
@@ -450,17 +442,7 @@ class MeterReadingController extends Controller
         Request $request,
         MeterReading $meterReading
     ): JsonResponse {
-
-        abort_unless(
-
-            $meterReading->company_id
-            ===
-            $request
-                ->user()
-                ->company_id,
-
-            404
-        );
+        $this->authorize('approve', $meterReading);
 
         $service =
             new MeterReadingProcessorService(
@@ -499,17 +481,7 @@ class MeterReadingController extends Controller
         Request $request,
         MeterReading $meterReading
     ): JsonResponse {
-
-        abort_unless(
-
-            $meterReading->company_id
-            ===
-            $request
-                ->user()
-                ->company_id,
-
-            404
-        );
+        $this->authorize('reject', $meterReading);
 
         $validated =
             $request->validate([
@@ -563,6 +535,8 @@ class MeterReadingController extends Controller
 
     public function entryGrid(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', MeterReading::class);
+
         $validated = $request->validate([
             'reading_date' => ['required', 'date'],
             'building_id' => ['nullable', 'uuid', 'exists:buildings,id'],
@@ -597,6 +571,8 @@ class MeterReadingController extends Controller
 
     public function bulkApprove(BulkMeterReadingApprovalRequest $request): JsonResponse
     {
+        $this->authorize('bulkManage', MeterReading::class);
+
         $validated = $request->validated();
 
         $result = (new BulkMeterReadingApprovalService($request->user()))
@@ -622,6 +598,8 @@ class MeterReadingController extends Controller
 
     public function bulkStore(BulkMeterReadingRequest $request): JsonResponse
     {
+        $this->authorize('bulkManage', MeterReading::class);
+
         $validated = $request->validated();
 
         $result = (new BulkMeterReadingService($request->user()))
@@ -655,6 +633,7 @@ class MeterReadingController extends Controller
     public function anomalies(
         Request $request
     ): JsonResponse {
+        $this->authorize('viewAny', MeterReading::class);
 
         $readings = MeterReading::query()
 

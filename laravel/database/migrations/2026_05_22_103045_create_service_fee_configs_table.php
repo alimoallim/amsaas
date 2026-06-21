@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('service_fee_configs', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('company_id')->constrained('companies')->onDelete('cascade');
             $table->foreignUuid('building_id')->constrained('buildings')->onDelete('cascade');
             $table->foreignUuid('apartment_id')->nullable()->constrained('apartments')->onDelete('set null');

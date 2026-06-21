@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\SaleReservation;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -9,7 +10,10 @@ class RecordReservationDepositRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $reservation = $this->route('sale_reservation');
+
+        return $reservation instanceof SaleReservation
+            && ($this->user()?->can('recordDeposit', $reservation) ?? false);
     }
 
     public function rules(): array

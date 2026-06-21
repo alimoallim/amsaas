@@ -1,6 +1,6 @@
 <template>
   <div
-    class="auth-shell flex min-h-[100dvh]"
+    class="auth-shell bg-slate-50 dark:bg-[var(--erp-bg)] lg:flex lg:h-[100dvh] lg:min-h-0 lg:flex-row lg:overflow-hidden"
     :data-theme="themeStore.resolved"
   >
     <!-- Brand panel (desktop) -->
@@ -73,8 +73,10 @@
     </aside>
 
     <!-- Form panel -->
-    <main class="flex min-h-[100dvh] min-w-0 flex-1 flex-col overflow-y-auto bg-slate-50 dark:bg-[var(--erp-bg)]">
-      <div class="flex shrink-0 items-center justify-between px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
+    <main
+      class="auth-shell-panel relative z-10 flex flex-col lg:min-w-0 lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:overscroll-y-contain"
+    >
+      <div class="auth-shell-header flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
         <div class="flex min-w-0 items-center gap-2.5 lg:hidden">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -89,8 +91,8 @@
         </div>
       </div>
 
-      <div class="auth-shell-main flex flex-1 flex-col items-stretch justify-start px-4 pb-8 pt-1 sm:items-center sm:justify-center sm:px-6 sm:pb-10 lg:px-8">
-        <div class="w-full min-w-0" :class="wide ? 'max-w-2xl' : 'max-w-md'">
+      <div class="auth-shell-main px-4 pb-8 pt-2 sm:px-6 sm:pb-10 lg:flex lg:flex-1 lg:flex-col lg:items-center lg:justify-center lg:px-8 lg:pt-1">
+        <div class="auth-shell-form w-full min-w-0 mx-auto" :class="wide ? 'max-w-2xl' : 'max-w-md'">
           <slot />
         </div>
       </div>
@@ -101,6 +103,7 @@
 <script setup>
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import { useThemeStore } from '@/stores/theme'
+import { useDocumentRouteClass } from '@/composables/useDocumentRouteClass'
 
 defineProps({
   eyebrow: { type: String, default: '' },
@@ -111,4 +114,5 @@ defineProps({
 })
 
 const themeStore = useThemeStore()
+useDocumentRouteClass('auth-route')
 </script>

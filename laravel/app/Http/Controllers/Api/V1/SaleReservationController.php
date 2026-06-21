@@ -8,18 +8,23 @@ use App\Http\Requests\Api\V1\StoreSaleReservationRequest;
 use App\Http\Resources\Api\V1\SaleReservationResource;
 use App\Models\SaleReservation;
 use App\Services\Sales\ReservationService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class SaleReservationController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __construct(
         private readonly ReservationService $reservations,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
+        $this->authorize('viewAny', SaleReservation::class);
+
         $reservations = SaleReservation::query()
             ->where('company_id', $request->user()->company_id)
             ->with(['apartment.building', 'buyer', 'depositPayment'])
@@ -42,6 +47,8 @@ class SaleReservationController extends Controller
 
     public function store(StoreSaleReservationRequest $request): JsonResponse
     {
+        $this->authorize('create', SaleReservation::class);
+
         $reservation = $this->reservations->create(
             $request->user(),
             $request->validated(),
@@ -58,7 +65,7 @@ class SaleReservationController extends Controller
 
     public function show(Request $request, SaleReservation $saleReservation): SaleReservationResource
     {
-        abort_if($saleReservation->company_id !== $request->user()->company_id, 403);
+        $this->authorize('view', $saleReservation);
 
         $saleReservation->load(['apartment.building', 'buyer', 'depositPayment']);
 
@@ -69,7 +76,7 @@ class SaleReservationController extends Controller
         RecordReservationDepositRequest $request,
         SaleReservation $saleReservation,
     ): JsonResponse {
-        abort_if($saleReservation->company_id !== $request->user()->company_id, 403);
+        $this->authorize('recordDeposit', $saleReservation);
 
         $reservation = $this->reservations->recordDeposit(
             $request->user(),
@@ -86,7 +93,7 @@ class SaleReservationController extends Controller
 
     public function cancel(Request $request, SaleReservation $saleReservation): JsonResponse
     {
-        abort_if($saleReservation->company_id !== $request->user()->company_id, 403);
+        $this->authorize('update', $saleReservation);
 
         $validated = $request->validate([
             'reason' => ['nullable', 'string', 'max:500'],

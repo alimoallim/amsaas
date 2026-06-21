@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\V1\BillingOperationsController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\ReportsController;
 use App\Http\Controllers\Api\V1\Auth\SetupController;
+use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\Webhook\PaymentWebhookController; 
 
 Route::prefix('v1')->group(function () {
@@ -55,7 +56,8 @@ Route::prefix('v1')->group(function () {
     | Third-Party Webhooks (Exempt from Sanctum Auth)
     |--------------------------------------------------------------------------
     */
-    // Route::post('webhooks/payments/evc-plus', [PaymentWebhookController::class, 'handleEvcPlus']);
+    Route::post('webhooks/payments/evc-plus', [PaymentWebhookController::class, 'handleEvcPlus'])
+        ->middleware('throttle:30,1');
 
     /*
     |--------------------------------------------------------------------------
@@ -67,6 +69,9 @@ Route::prefix('v1')->group(function () {
         // Session Identity Status Checks
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
+
+        Route::get('dashboard', [DashboardController::class, 'show'])
+            ->name('api.v1.dashboard.show');
 
         // Structural Corporate Layers
         Route::apiResource('companies', CompanyController::class);
@@ -151,6 +156,8 @@ Route::prefix('v1')->group(function () {
         Route::get('payments/receipt-account-options', [PaymentController::class, 'receiptAccountOptions']);
         Route::get('payments/tenant-balance', [PaymentController::class, 'tenantBalance'])
             ->name('api.v1.payments.tenant-balance');
+        Route::post('payments/{payment}/refund', [PaymentController::class, 'refund'])
+            ->name('api.v1.payments.refund');
         Route::apiResource('payments', PaymentController::class)->only(['index', 'store', 'show']);
 
         Route::prefix('reports')->group(function () {
@@ -235,6 +242,8 @@ Route::prefix('v1')->group(function () {
         Route::post('invoices/{invoice}/finalize', [MonthlyInvoiceController::class, 'finalize']);
         Route::post('invoices/{invoice}/void', [MonthlyInvoiceController::class, 'void'])
             ->name('api.v1.invoices.void');
+        Route::post('invoices/{invoice}/credit-note', [MonthlyInvoiceController::class, 'creditNote'])
+            ->name('api.v1.invoices.credit-note');
         Route::apiResource('invoices', MonthlyInvoiceController::class);
 
         /*

@@ -2,13 +2,14 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\SaleAgreement;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ApplySaleDepositRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('viewAny', SaleAgreement::class) ?? false;
     }
 
     /**

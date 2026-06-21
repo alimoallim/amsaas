@@ -1,5 +1,5 @@
 <template>
-  <form class="space-y-5" @submit.prevent="submit">
+  <div class="space-y-5">
     <AlertBanner v-if="serverError" :message="serverError" variant="error" @dismiss="serverError = ''" />
 
     <FormSection compact title="Reservation">
@@ -61,7 +61,7 @@
         Execute contract immediately (locks price and marks unit under contract)
       </label>
     </FormSection>
-  </form>
+  </div>
 </template>
 
 <script setup>

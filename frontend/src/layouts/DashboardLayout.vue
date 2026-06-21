@@ -342,8 +342,14 @@ const toggleCollapse = () => {
   localStorage.setItem('sb-collapsed', collapsed.value)
 }
 
-const openMobile  = () => { mobileOpen.value = true;  document.body.style.overflow = 'hidden' }
-const closeMobile = () => { mobileOpen.value = false; document.body.style.overflow = '' }
+const openMobile  = () => {
+  mobileOpen.value = true
+  document.body.classList.add('mobile-menu-open')
+}
+const closeMobile = () => {
+  mobileOpen.value = false
+  document.body.classList.remove('mobile-menu-open')
+}
 
 const goSettings = () => { router.push('/settings'); userMenuOpen.value = false; topbarMenuOpen.value = false }
 const doLogout = async () => {
@@ -378,7 +384,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  document.body.style.overflow = ''
+  document.body.classList.remove('mobile-menu-open')
   window.removeEventListener('keydown', handleKey)
   document.removeEventListener('click', handleClickOutside)
 })
@@ -441,9 +447,25 @@ watch(() => route.path, () => {
   font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
-  overflow: hidden;
+}
+
+/* Desktop only: inner scroll regions. Mobile uses document scroll (see responsive.css). */
+@media (min-width: 1024px) {
+  .shell {
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 1023px) {
+  .shell {
+    overflow-x: clip;
+    overflow-y: auto;
+    min-height: 100svh;
+    min-height: 100dvh;
+  }
 }
 
 /* ── Dark theme overrides ─────────────────────────────────── */
@@ -533,10 +555,18 @@ watch(() => route.path, () => {
     transform: translateX(-100%);
     width: var(--sb-w);             /* always full width on mobile */
     transition: transform .26s cubic-bezier(.32,0,.67,0);
+    /*
+     * Closed drawer must not receive taps — fixed full-height sidebar (z-index 40)
+     * still overlays the viewport on Android even when translated off-screen.
+     */
+    pointer-events: none;
+    visibility: hidden;
   }
   .sidebar--mobile-open {
     transform: translateX(0);
     transition: transform .3s cubic-bezier(.33,1,.68,1);
+    pointer-events: auto;
+    visibility: visible;
   }
 }
 
@@ -683,15 +713,29 @@ watch(() => route.path, () => {
   flex-direction: column;
   margin-left: var(--sb-w);
   min-width: 0;
-  height: 100vh;
-  overflow: hidden;
   transition: margin-left var(--t) var(--ease);
 }
 .main-shell--rail { margin-left: var(--sb-rail); }
 
+@media (min-width: 1024px) {
+  .main-shell {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+}
+
 @media (max-width: 1023px) {
   .main-shell,
-  .main-shell--rail { margin-left: 0; }
+  .main-shell--rail {
+    margin-left: 0;
+    height: auto;
+    min-height: 100svh;
+    min-height: 100dvh;
+    overflow: visible;
+    position: relative;
+    z-index: 25;
+  }
 }
 
 /* ─ Topbar ────────────────────────────────────────────────── */
@@ -749,7 +793,7 @@ watch(() => route.path, () => {
 }
 
 .topbar-sep { width: 1px; height: 22px; background: var(--border); margin: 0 2px; }
-@media (max-width: 640px) { .topbar-sep { display: none; } }
+@media (max-width: 1023px) { .topbar-sep { display: none; } }
 
 /* Search trigger */
 .search-trigger {
@@ -774,7 +818,7 @@ watch(() => route.path, () => {
   color: var(--subtle);
   font-family: ui-monospace, monospace;
 }
-@media (max-width: 767px) { .search-trigger { display: none; } }
+@media (max-width: 1023px) { .search-trigger { display: none; } }
 
 /* Period chip */
 .period-chip {
@@ -890,15 +934,40 @@ watch(() => route.path, () => {
   padding: 24px;
   min-width: 0;
   outline: none;
+  -webkit-overflow-scrolling: touch;
 }
-@media (max-width: 767px) {
-  .page-content { padding: 16px; }
-  .topbar { padding: 0 12px; gap: 8px; }
+@media (max-width: 1023px) {
+  .topbar {
+    flex-wrap: nowrap;
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .page-content {
+    overflow-y: visible;
+  }
+
+  .topbar-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .topbar-right {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .breadcrumb { display: none; }
   .page-heading { font-size: 15px; }
 }
 
+@media (max-width: 767px) {
+  .page-content { padding: 16px; }
+}
+
 @media (max-width: 480px) {
-  .breadcrumb { display: none; }
   .topbar-user { padding-right: 6px; }
 }
 

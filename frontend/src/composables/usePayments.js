@@ -126,6 +126,30 @@ export function usePayments() {
     }
   }
 
+  async function refundPayment(id, { amount, reason, allocationIds } = {}) {
+    saving.value = true
+    error.value = null
+    try {
+      const body = {
+        amount: Number(amount),
+        reason,
+      }
+      if (allocationIds?.length) {
+        body.allocation_ids = allocationIds
+      }
+      const { data } = await api.post(`/payments/${id}/refund`, body)
+      return {
+        payment: unwrapApiRecord(data),
+        message: data.message ?? '',
+      }
+    } catch (e) {
+      error.value = e
+      throw e
+    } finally {
+      saving.value = false
+    }
+  }
+
   async function fetchOne(id) {
     loading.value = true
     error.value = null
@@ -153,6 +177,7 @@ export function usePayments() {
     fetchList,
     fetchOne,
     recordPayment,
+    refundPayment,
     fetchTenantBalance,
   }
 }

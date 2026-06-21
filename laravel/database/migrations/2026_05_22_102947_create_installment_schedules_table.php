@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('installment_schedules', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('sale_agreement_id')->constrained('sale_agreements')->onDelete('cascade');
             $table->integer('installment_number');
             $table->date('due_date');

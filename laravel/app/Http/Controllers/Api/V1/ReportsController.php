@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\SendCollectionReminderRequest;
 use App\Models\CollectionNotice;
 use App\Models\DelinquencyFlag;
+use App\Models\MonthlyInvoice;
 use App\Services\Collections\AgingReceivablesService;
 use App\Services\Collections\CollectionNoticePdfService;
 use App\Services\Collections\CollectionReminderService;
 use App\Services\Collections\DelinquencyTrackingService;
 use App\Support\TenantContext;
 use Carbon\Carbon;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,8 +21,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportsController extends Controller
 {
+    use AuthorizesRequests;
+
     public function aging(Request $request, AgingReceivablesService $aging): JsonResponse
     {
+        $this->authorize('viewAny', MonthlyInvoice::class);
+
         $validated = $request->validate([
             'as_of' => 'nullable|date',
             'building_id' => 'nullable|uuid|exists:buildings,id',
@@ -49,6 +55,8 @@ class ReportsController extends Controller
 
     public function delinquency(Request $request, DelinquencyTrackingService $tracking): JsonResponse
     {
+        $this->authorize('viewAny', MonthlyInvoice::class);
+
         $validated = $request->validate([
             'as_of' => 'nullable|date',
             'building_id' => 'nullable|uuid|exists:buildings,id',
@@ -79,6 +87,8 @@ class ReportsController extends Controller
         SendCollectionReminderRequest $request,
         CollectionReminderService $reminders,
     ): JsonResponse {
+        $this->authorize('viewAny', MonthlyInvoice::class);
+
         $user = $request->user();
         TenantContext::setCompanyId((string) $user->company_id);
 
@@ -99,6 +109,8 @@ class ReportsController extends Controller
         Request $request,
         CollectionNoticePdfService $notices,
     ): JsonResponse {
+        $this->authorize('viewAny', MonthlyInvoice::class);
+
         $validated = $request->validate([
             'flag_id' => 'required|uuid|exists:delinquency_flags,id',
         ]);
@@ -128,6 +140,8 @@ class ReportsController extends Controller
 
     public function downloadNotice(Request $request, CollectionNotice $notice)
     {
+        $this->authorize('viewAny', MonthlyInvoice::class);
+
         abort_unless($notice->company_id === $request->user()->company_id, 404);
 
         if (! Storage::disk('local')->exists($notice->file_path)) {
@@ -144,6 +158,8 @@ class ReportsController extends Controller
 
     public function reminderLogs(Request $request, CollectionReminderService $reminders): JsonResponse
     {
+        $this->authorize('viewAny', MonthlyInvoice::class);
+
         $validated = $request->validate([
             'tenant_id' => 'required|uuid|exists:tenants,id',
         ]);
@@ -159,6 +175,8 @@ class ReportsController extends Controller
 
     public function agingExport(Request $request, AgingReceivablesService $aging): StreamedResponse
     {
+        $this->authorize('viewAny', MonthlyInvoice::class);
+
         $validated = $request->validate([
             'as_of' => 'nullable|date',
             'building_id' => 'nullable|uuid|exists:buildings,id',

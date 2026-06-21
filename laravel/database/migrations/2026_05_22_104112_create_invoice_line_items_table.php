@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('invoice_line_items', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('monthly_invoice_id')->constrained('monthly_invoices')->onDelete('cascade');
             $table->string('line_type', 50); // rent | electricity | water | security_fee | etc...
             $table->string('description', 500);

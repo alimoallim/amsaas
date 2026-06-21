@@ -13,6 +13,7 @@ use App\Services\Billing\MonthlyInvoiceListService;
 use App\Services\Billing\TenantBillingService;
 use App\Services\Property\TenantLeaseEligibilityService;
 use App\Support\TenantContext;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -20,6 +21,8 @@ use Illuminate\Support\Str;
 
 class TenantController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __construct(
         private readonly TenantLeaseEligibilityService $leaseEligibility,
     ) {}
@@ -32,6 +35,7 @@ class TenantController extends Controller
     public function index(
         Request $request
     ): AnonymousResourceCollection {
+        $this->authorize('viewAny', Tenant::class);
 
         $tenants = Tenant::query()
 
@@ -191,6 +195,7 @@ class TenantController extends Controller
     public function store(
         StoreTenantRequest $request
     ): JsonResponse {
+        $this->authorize('create', Tenant::class);
 
         $validated =
             $request->validated();
@@ -266,11 +271,7 @@ class TenantController extends Controller
         Request $request,
         Tenant $tenant,
     ): JsonResponse {
-        abort_if(
-            $tenant->company_id !== $request->user()->company_id,
-            403,
-            'Unauthorized access.'
-        );
+        $this->authorize('view', $tenant);
 
         $validated = $request->validate([
             'year' => 'nullable|integer|between:2020,2050',
@@ -318,22 +319,7 @@ class TenantController extends Controller
         Request $request,
         Tenant $tenant
     ): TenantResource {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Tenant Isolation
-        |--------------------------------------------------------------------------
-        */
-
-        abort_if(
-
-            $tenant->company_id
-                !== $request->user()->company_id,
-
-            403,
-
-            'Unauthorized access.'
-        );
+        $this->authorize('view', $tenant);
 
         /*
         |--------------------------------------------------------------------------
@@ -417,22 +403,7 @@ class TenantController extends Controller
         Request $request,
         Tenant $tenant
     ): JsonResponse {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Tenant Isolation
-        |--------------------------------------------------------------------------
-        */
-
-        abort_if(
-
-            $tenant->company_id
-                !== $request->user()->company_id,
-
-            403,
-
-            'Unauthorized access.'
-        );
+        $this->authorize('delete', $tenant);
 
         $this->leaseEligibility->assertCanDelete($tenant);
 

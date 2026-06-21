@@ -31,8 +31,6 @@ const form = reactive({
   status: 'draft',
   rent_charge_model_id: '',
   recurring_charges: [],
-  notes: '',
-  special_terms: '',
 })
 
 async function loadDependencies() {

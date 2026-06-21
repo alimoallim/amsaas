@@ -10,6 +10,7 @@
     <PageHeader
       title="Welcome back"
       description="Sign in to your company workspace"
+      class="auth-login-intro"
     />
 
     <AlertBanner
@@ -19,18 +20,24 @@
       @dismiss="errorMessage = ''"
     />
 
-    <ErpPanel class="mt-5">
-      <form class="space-y-5" @submit.prevent="submitLogin" novalidate>
-        <FormField label="Email address" :error="fieldErrors.email" required>
+    <ErpPanel class="auth-login-panel mt-4 sm:mt-5 !overflow-visible">
+      <form class="auth-login-form space-y-5" @submit.prevent="submitLogin" novalidate autocomplete="on">
+        <FormField field-id="login-email" label="Email address" :error="fieldErrors.email" required>
           <template #default="{ id }">
           <input
             :id="id"
             v-model="form.email"
+            name="email"
             type="email"
+            inputmode="email"
+            autocomplete="username"
+            enterkeyhint="next"
+            autocapitalize="none"
+            autocorrect="off"
+            spellcheck="false"
             required
-            autocomplete="email"
             placeholder="you@company.com"
-            class="erp-input"
+            class="auth-login-input erp-input"
             :class="{ 'erp-input--error': fieldErrors.email }"
             @focus="fieldErrors.email = ''"
             @blur="validateEmail"
@@ -38,26 +45,30 @@
           </template>
         </FormField>
 
-        <FormField label="Password" :error="fieldErrors.password" required>
+        <FormField field-id="login-password" label="Password" :error="fieldErrors.password" required>
           <template #default="{ id }">
             <div class="relative">
               <input
                 :id="id"
                 v-model="form.password"
+                name="password"
                 :type="showPassword ? 'text' : 'password'"
+                inputmode="text"
+                enterkeyhint="go"
                 required
                 autocomplete="current-password"
                 placeholder="Enter your password"
-                class="erp-input pr-10"
+                class="auth-login-input erp-input w-full pr-11"
                 :class="{ 'erp-input--error': fieldErrors.password }"
                 @focus="fieldErrors.password = ''"
                 @blur="validatePassword"
               />
               <button
                 type="button"
-                class="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                tabindex="-1"
+                class="auth-login-toggle absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 :aria-label="showPassword ? 'Hide password' : 'Show password'"
-                @click="showPassword = !showPassword"
+                @click.prevent="showPassword = !showPassword"
               >
                 <svg v-if="!showPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
@@ -84,7 +95,6 @@
           <a
             href="#"
             class="text-sm font-medium text-indigo-600 hover:text-indigo-700 sm:text-right dark:text-indigo-400 dark:hover:text-indigo-300"
-            tabindex="-1"
           >
             Forgot password?
           </a>
@@ -103,7 +113,7 @@
       </form>
     </ErpPanel>
 
-    <div class="mt-6 text-center">
+    <div class="auth-login-footer mt-6 text-center">
       <p class="text-sm text-slate-500 dark:text-slate-400">
         New to AMSAAS?
         <router-link
@@ -198,3 +208,15 @@ const submitLogin = async () => {
   }
 }
 </script>
+
+<style scoped>
+@media (max-width: 1023px) {
+  :deep(.auth-login-intro p) {
+    display: none;
+  }
+
+  .auth-login-footer p:last-child {
+    display: none;
+  }
+}
+</style>

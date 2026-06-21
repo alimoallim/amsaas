@@ -580,7 +580,9 @@ watch(
 async function loadRentalAgreements() {
   agreementsLoading.value = true
   try {
-    const { data } = await api.get('/rental-agreements', { params: { per_page: 100 } })
+    const { data } = await api.get('/rental-agreements', {
+      params: { per_page: 100, include_deposit_ledger: 1 },
+    })
     rentalAgreements.value = data.data ?? []
   } catch {
     rentalAgreements.value = []

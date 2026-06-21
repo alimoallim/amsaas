@@ -6,7 +6,7 @@
     description="Prospective and active property buyers — separate from tenant records."
   >
     <template #actions>
-      <ErpButton @click="formModal.openCreate()">New buyer</ErpButton>
+      <ErpButton :to="{ name: 'BuyerCreate' }">New buyer</ErpButton>
     </template>
 
     <template #kpis>
@@ -47,10 +47,10 @@
         empty-title="No buyers"
         empty-description="Register a buyer to start the sales pipeline."
         @page-change="fetchList"
-        @row-click="(row) => formModal.openEdit(row.id)"
+        @row-click="(row) => router.push({ name: 'BuyerEdit', params: { id: row.id } })"
       >
         <template #emptyAction>
-          <ErpButton @click="formModal.openCreate()">New buyer</ErpButton>
+          <ErpButton :to="{ name: 'BuyerCreate' }">New buyer</ErpButton>
         </template>
         <template #cell-name="{ row }">
           <span class="font-medium">{{ row.full_name || '—' }}</span>
@@ -84,12 +84,6 @@
     </template>
   </WorklistLayout>
 
-  <BuyerFormModal
-    :open="formModal.state.open"
-    :entity-id="formModal.state.id"
-    @close="formModal.close()"
-    @saved="onSaved"
-  />
 </template>
 
 <script setup>
@@ -97,9 +91,7 @@ import { watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBuyers } from '@/composables/useBuyers'
 import { useSmartFilters } from '@/composables/useSmartFilters'
-import { useFormModal } from '@/composables/useFormModal'
 import { compactActions, editAction } from '@/composables/useTableActions'
-import BuyerFormModal from '@/components/forms/BuyerFormModal.vue'
 import {
   WorklistLayout,
   SmartFilterBar,
@@ -114,7 +106,6 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const formModal = useFormModal()
 const { items, loading, meta, filters, summary, fetchList, resetFilters } = useBuyers()
 
 const { filters: smartFilters, chips, clearAll, removeChip, bindRoute } = useSmartFilters({
@@ -141,7 +132,7 @@ const columns = [
 
 function buyerActions(row) {
   return compactActions([
-    editAction(() => formModal.openEdit(row.id), 'Edit'),
+    editAction(() => router.push({ name: 'BuyerEdit', params: { id: row.id } }), 'Edit'),
   ])
 }
 
@@ -162,13 +153,8 @@ function onClearAll() {
   syncAndFetch()
 }
 
-async function onSaved() {
-  await fetchList(meta.value.current_page)
-}
-
 onMounted(() => {
   bindRoute(route, router, { debounceMs: 300 })
-  formModal.syncFromRoute(route, router)
   fetchList()
 })
 </script>

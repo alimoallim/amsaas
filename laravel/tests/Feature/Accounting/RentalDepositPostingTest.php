@@ -169,6 +169,57 @@ class RentalDepositPostingTest extends TestCase
         $this->assertSame(150.0, $summary['available']);
     }
 
+    public function test_rental_agreement_controls_expose_deposit_actions(): void
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->create(['company_id' => $company->id]);
+        Sanctum::actingAs($user);
+
+        [$agreement, $tenant] = $this->rentalAgreement($company, securityDeposit: 800);
+
+        $this->getJson("/api/v1/rental-agreements/{$agreement->id}")
+            ->assertOk()
+            ->assertJsonPath('data.controls.can_record_deposit', true)
+            ->assertJsonPath('data.controls.can_refund_deposit', false);
+
+        app(PaymentService::class)->recordPayment($user, [
+            'tenant_id' => $tenant->id,
+            'agreement_id' => $agreement->id,
+            'payment_purpose' => Payment::PURPOSE_SECURITY_DEPOSIT,
+            'amount' => 800,
+            'payment_date' => '2026-07-01',
+            'payment_method' => 'cash',
+        ]);
+
+        $this->getJson("/api/v1/rental-agreements/{$agreement->id}")
+            ->assertOk()
+            ->assertJsonPath('data.controls.can_record_deposit', false)
+            ->assertJsonPath('data.controls.can_refund_deposit', true);
+    }
+
+    public function test_rental_agreement_index_can_include_deposit_ledger(): void
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->create(['company_id' => $company->id]);
+        Sanctum::actingAs($user);
+
+        [$agreement, $tenant] = $this->rentalAgreement($company, securityDeposit: 500);
+
+        app(PaymentService::class)->recordPayment($user, [
+            'tenant_id' => $tenant->id,
+            'agreement_id' => $agreement->id,
+            'payment_purpose' => Payment::PURPOSE_SECURITY_DEPOSIT,
+            'amount' => 300,
+            'payment_date' => '2026-07-01',
+            'payment_method' => 'cash',
+        ]);
+
+        $this->getJson('/api/v1/rental-agreements?include_deposit_ledger=1')
+            ->assertOk()
+            ->assertJsonPath('data.0.financials.deposit_ledger.received', 300)
+            ->assertJsonPath('data.0.financials.deposit_ledger.available', 300);
+    }
+
     public function test_rental_agreement_show_includes_deposit_ledger(): void
     {
         $company = Company::factory()->create();

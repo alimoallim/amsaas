@@ -35,6 +35,7 @@ class MeterController extends Controller
     public function index(
         Request $request
     ): JsonResponse {
+        $this->authorize('viewAny', Meter::class);
 
         $query = Meter::query()
 
@@ -371,7 +372,8 @@ class MeterController extends Controller
     public function store(
         StoreMeterRequest $request
     ): JsonResponse {
-        
+        $this->authorize('create', Meter::class);
+
         $meter = Meter::create([
 
             ...$request->validated(),

@@ -16,7 +16,10 @@ class UpdateMeterRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        $meter = $this->route('meter');
+
+        return $meter instanceof Meter
+            && ($this->user()?->can('update', $meter) ?? false);
     }
 
     /**

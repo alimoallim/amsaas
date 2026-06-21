@@ -14,11 +14,13 @@ use App\Http\Requests\Api\V1\UpdateSaleAgreementRequest;
 use App\Http\Resources\Api\V1\SaleAgreementResource;
 use App\Models\Agreement;
 use App\Models\SaleAgreement;
+use App\Models\User;
 use App\Services\Sales\OwnershipTransferService;
 use App\Services\Sales\SaleAgreementPostingService;
 use App\Services\Sales\SaleAgreementService;
 use App\Services\Sales\SaleLegalDocumentService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -29,6 +31,8 @@ use Throwable;
 
 class SaleAgreementController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __construct(
         private readonly SaleAgreementService $saleAgreements,
         private readonly SaleAgreementPostingService $posting,
@@ -38,6 +42,8 @@ class SaleAgreementController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', SaleAgreement::class);
+
         $agreements = SaleAgreement::query()
             ->with(['agreement.apartment.building', 'agreement.buyer'])
             ->whereHas(
@@ -97,6 +103,8 @@ class SaleAgreementController extends Controller
 
     public function store(StoreSaleAgreementRequest $request): JsonResponse
     {
+        $this->authorize('create', SaleAgreement::class);
+
         try {
             $sale = $this->saleAgreements->create(
                 $request->user(),
@@ -138,21 +146,13 @@ class SaleAgreementController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $sale = SaleAgreement::query()
-            ->with([
-                'agreement.apartment.building',
-                'agreement.buyer',
-                'paymentAllocations.payment',
-                'depositApplications',
-                'ownershipApprovals.approvedBy',
-            ])
-            ->whereHas(
-                'agreement',
-                fn ($query) => $query
-                    ->where('company_id', $request->user()->company_id)
-                    ->where('id', $id),
-            )
-            ->first();
+        $sale = $this->findSaleAgreement($request->user(), $id, [
+            'agreement.apartment.building',
+            'agreement.buyer',
+            'paymentAllocations.payment',
+            'depositApplications',
+            'ownershipApprovals.approvedBy',
+        ]);
 
         if (! $sale) {
             return response()->json([
@@ -160,6 +160,8 @@ class SaleAgreementController extends Controller
                 'message' => 'Sale agreement not found.',
             ], 404);
         }
+
+        $this->authorize('view', $sale);
 
         return response()->json([
             'success' => true,
@@ -169,6 +171,11 @@ class SaleAgreementController extends Controller
 
     public function update(UpdateSaleAgreementRequest $request, string $id): JsonResponse
     {
+        $sale = $this->findSaleAgreement($request->user(), $id);
+        if ($sale) {
+            $this->authorize('update', $sale);
+        }
+
         try {
             $sale = $this->saleAgreements->update(
                 $request->user(),
@@ -191,6 +198,11 @@ class SaleAgreementController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
+        $sale = $this->findSaleAgreement($request->user(), $id);
+        if ($sale) {
+            $this->authorize('delete', $sale);
+        }
+
         try {
             $this->saleAgreements->destroy($request->user(), $id);
 
@@ -208,6 +220,11 @@ class SaleAgreementController extends Controller
 
     public function execute(Request $request, string $id): JsonResponse
     {
+        $sale = $this->findSaleAgreement($request->user(), $id);
+        if ($sale) {
+            $this->authorize('update', $sale);
+        }
+
         try {
             $sale = $this->saleAgreements->execute($request->user(), $id);
 
@@ -229,6 +246,11 @@ class SaleAgreementController extends Controller
         $validated = $request->validate([
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
+
+        $sale = $this->findSaleAgreement($request->user(), $id);
+        if ($sale) {
+            $this->authorize('update', $sale);
+        }
 
         try {
             $sale = $this->saleAgreements->cancel(
@@ -252,6 +274,11 @@ class SaleAgreementController extends Controller
 
     public function recordInstallmentPayment(RecordSaleInstallmentPaymentRequest $request, string $id): JsonResponse
     {
+        $sale = $this->findSaleAgreement($request->user(), $id);
+        if ($sale) {
+            $this->authorize('update', $sale);
+        }
+
         try {
             $result = $this->posting->recordInstallmentPayment(
                 $request->user(),
@@ -280,6 +307,11 @@ class SaleAgreementController extends Controller
 
     public function applyDeposit(ApplySaleDepositRequest $request, string $id): JsonResponse
     {
+        $sale = $this->findSaleAgreement($request->user(), $id);
+        if ($sale) {
+            $this->authorize('update', $sale);
+        }
+
         try {
             $result = $this->posting->applyReservationDeposit(
                 $request->user(),
@@ -308,6 +340,11 @@ class SaleAgreementController extends Controller
 
     public function recordPayment(RecordSalePaymentRequest $request, string $id): JsonResponse
     {
+        $sale = $this->findSaleAgreement($request->user(), $id);
+        if ($sale) {
+            $this->authorize('update', $sale);
+        }
+
         try {
             $result = $this->posting->recordPayment(
                 $request->user(),
@@ -336,17 +373,18 @@ class SaleAgreementController extends Controller
 
     public function downloadCompletionCertificate(Request $request, string $id): BinaryFileResponse|JsonResponse
     {
-        $sale = SaleAgreement::query()
-            ->with('agreement')
-            ->whereHas(
-                'agreement',
-                fn ($query) => $query
-                    ->where('company_id', $request->user()->company_id)
-                    ->where('id', $id),
-            )
-            ->first();
+        $sale = $this->findSaleAgreement($request->user(), $id, ['agreement']);
 
-        if (! $sale || ! $sale->completion_certificate_path) {
+        if (! $sale) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sale agreement not found.',
+            ], 404);
+        }
+
+        $this->authorize('view', $sale);
+
+        if (! $sale->completion_certificate_path) {
             return response()->json([
                 'success' => false,
                 'message' => 'Completion certificate not available.',
@@ -372,6 +410,11 @@ class SaleAgreementController extends Controller
 
     public function approveOwnership(ApproveOwnershipTransferRequest $request, string $id): JsonResponse
     {
+        $sale = $this->findSaleAgreement($request->user(), $id);
+        if ($sale) {
+            $this->authorize('update', $sale);
+        }
+
         try {
             $validated = $request->validated();
             $result = $this->ownershipTransfers->approve(
@@ -397,6 +440,11 @@ class SaleAgreementController extends Controller
 
     public function issueTitleDeed(IssueTitleDeedRequest $request, string $id): JsonResponse
     {
+        $sale = $this->findSaleAgreement($request->user(), $id);
+        if ($sale) {
+            $this->authorize('update', $sale);
+        }
+
         try {
             $validated = $request->validated();
             $sale = $this->ownershipTransfers->issueTitleDeed(
@@ -423,7 +471,16 @@ class SaleAgreementController extends Controller
     {
         $sale = $this->resolveSaleForDocuments($request, $id);
 
-        if (! $sale || ! $sale->ownership_transfer_certificate_path) {
+        if (! $sale) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sale agreement not found.',
+            ], 404);
+        }
+
+        $this->authorize('view', $sale);
+
+        if (! $sale->ownership_transfer_certificate_path) {
             return response()->json([
                 'success' => false,
                 'message' => 'Ownership transfer certificate not available.',
@@ -447,6 +504,8 @@ class SaleAgreementController extends Controller
                 'message' => 'Sale agreement not found.',
             ], 404);
         }
+
+        $this->authorize('view', $sale);
 
         $filename = sprintf(
             '%s-contract.pdf',
@@ -485,6 +544,8 @@ class SaleAgreementController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $sale);
+
         if (! $sale->isPaymentPlan()) {
             return response()->json([
                 'success' => false,
@@ -515,15 +576,10 @@ class SaleAgreementController extends Controller
 
     public function generateSchedule(Request $request, string $id): JsonResponse
     {
-        $sale = SaleAgreement::query()
-            ->with(['agreement.apartment.building', 'agreement.buyer'])
-            ->whereHas(
-                'agreement',
-                fn ($query) => $query
-                    ->where('company_id', $request->user()->company_id)
-                    ->where('id', $id),
-            )
-            ->first();
+        $sale = $this->findSaleAgreement($request->user(), $id, [
+            'agreement.apartment.building',
+            'agreement.buyer',
+        ]);
 
         if (! $sale) {
             return response()->json([
@@ -531,6 +587,8 @@ class SaleAgreementController extends Controller
                 'message' => 'Sale agreement not found.',
             ], 404);
         }
+
+        $this->authorize('view', $sale);
 
         return response()->json([
             'success' => true,
@@ -541,16 +599,24 @@ class SaleAgreementController extends Controller
 
     private function resolveSaleForDocuments(Request $request, string $id): ?SaleAgreement
     {
+        return $this->findSaleAgreement($request->user(), $id, [
+            'agreement.apartment.building',
+            'agreement.buyer',
+            'paymentAllocations.payment',
+        ]);
+    }
+
+    /**
+     * @param  list<string>  $with
+     */
+    protected function findSaleAgreement(User $user, string $id, array $with = []): ?SaleAgreement
+    {
         return SaleAgreement::query()
-            ->with([
-                'agreement.apartment.building',
-                'agreement.buyer',
-                'paymentAllocations.payment',
-            ])
+            ->when($with !== [], fn ($query) => $query->with($with))
             ->whereHas(
                 'agreement',
                 fn ($query) => $query
-                    ->where('company_id', $request->user()->company_id)
+                    ->where('company_id', $user->company_id)
                     ->where('id', $id),
             )
             ->first();

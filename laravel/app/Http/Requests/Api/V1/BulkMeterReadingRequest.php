@@ -2,13 +2,14 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\MeterReading;
 use Illuminate\Foundation\Http\FormRequest;
 
 class BulkMeterReadingRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('bulkManage', MeterReading::class) ?? false;
     }
 
     /**

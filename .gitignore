@@ -9,6 +9,8 @@ laravel/bootstrap/cache/*.php
 # Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/.env
+frontend/dist.zip
 
 # IDE
 .vscode/
@@ -20,3 +22,20 @@ Thumbs.db
 
 # Logs
 *.log
+*.zip
+!terraform/**/*.zip
+
+# Deploy secrets (use config.env.example as template)
+scripts/deploy/config.env
+scripts/deploy/.last-*-task-arn
+
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+terraform/*.tfvars
+!terraform/terraform.tfvars.example
+terraform/crash.log
+terraform/override.tf
+terraform/override.tf.json

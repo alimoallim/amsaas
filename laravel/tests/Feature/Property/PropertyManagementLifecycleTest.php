@@ -233,4 +233,46 @@ class PropertyManagementLifecycleTest extends TestCase
             ->assertJsonPath('data.listing.listing_type', Apartment::LISTING_TYPE_SALE)
             ->assertJsonPath('data.pricing.market_sale_price', fn ($v) => (float) $v === 185000.0);
     }
+
+    public function test_rental_agreement_index_filters_by_tenant_id(): void
+    {
+        [$company] = $this->actingCompanyUser();
+        $building = Building::factory()->create(['company_id' => $company->id]);
+
+        $tenantA = Tenant::factory()->create(['company_id' => $company->id, 'status' => 'active']);
+        $tenantB = Tenant::factory()->create(['company_id' => $company->id, 'status' => 'active']);
+
+        $apartmentA = Apartment::factory()->create([
+            'company_id' => $company->id,
+            'building_id' => $building->id,
+            'listing_type' => Apartment::LISTING_TYPE_RENTAL,
+            'inventory_status' => Apartment::STATUS_AVAILABLE,
+        ]);
+        $apartmentB = Apartment::factory()->create([
+            'company_id' => $company->id,
+            'building_id' => $building->id,
+            'listing_type' => Apartment::LISTING_TYPE_RENTAL,
+            'inventory_status' => Apartment::STATUS_AVAILABLE,
+        ]);
+
+        $agreementA = Agreement::factory()->withRentalAgreement()->create([
+            'company_id' => $company->id,
+            'tenant_id' => $tenantA->id,
+            'apartment_id' => $apartmentA->id,
+            'status' => Agreement::STATUS_DRAFT,
+        ]);
+        Agreement::factory()->withRentalAgreement()->create([
+            'company_id' => $company->id,
+            'tenant_id' => $tenantB->id,
+            'apartment_id' => $apartmentB->id,
+            'status' => Agreement::STATUS_DRAFT,
+        ]);
+
+        $response = $this->getJson("/api/v1/rental-agreements?tenant_id={$tenantA->id}")
+            ->assertOk();
+
+        $ids = collect($response->json('data'))->pluck('id');
+        $this->assertTrue($ids->contains($agreementA->id));
+        $this->assertCount(1, $ids);
+    }
 }

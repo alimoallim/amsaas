@@ -122,6 +122,35 @@ class CollectionReminderTest extends TestCase
         Queue::assertPushed(SendCollectionReminderJob::class);
     }
 
+    public function test_dispatch_log_sends_sms_when_configured(): void
+    {
+        config(['sms.enabled' => true, 'sms.driver' => 'log']);
+
+        [$company, $invoice, , $tenant] = $this->seedInvoiceWithTenant(
+            dueDate: '2026-06-15',
+            email: '',
+            withUser: true,
+        );
+
+        $tenant->update(['phone' => '+252612345678']);
+
+        $log = CollectionReminderLog::query()->create([
+            'company_id' => $company->id,
+            'tenant_id' => $tenant->id,
+            'monthly_invoice_id' => $invoice->id,
+            'reminder_type' => CollectionReminderType::Manual,
+            'channel' => 'sms',
+            'status' => 'queued',
+        ]);
+
+        app(CollectionReminderService::class)->dispatchLog($log);
+
+        $log->refresh();
+        $this->assertSame('sent', $log->status);
+        $this->assertSame('sms', $log->channel);
+        $this->assertSame('+252612345678', $log->recipient);
+    }
+
     public function test_dispatch_log_sends_email(): void
     {
         Mail::fake();

@@ -75,6 +75,7 @@ const ariaLabel = computed(() =>
   font-size: 0.75rem;
   font-weight: 500;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  touch-action: manipulation;
 }
 
 .theme-toggle:hover {

@@ -7,11 +7,14 @@ use App\Models\Meter;
 
 class MeterPolicy
 {
-    public function viewAny(
-        User $user
-    ): bool {
+    public function viewAny(User $user): bool
+    {
+        return ! empty($user->company_id);
+    }
 
-        return true;
+    public function create(User $user): bool
+    {
+        return ! empty($user->company_id);
     }
 
     public function view(

@@ -17,7 +17,7 @@
       <ErpButton variant="ghost" size="sm" :loading="loading" @click="fetchList(meta.current_page)">Refresh</ErpButton>
       <ErpButton variant="secondary" :to="{ name: 'MeterReadingApprovalQueue' }">Approval queue</ErpButton>
       <ErpButton variant="secondary" :to="{ name: 'MeterReadingBulkEntry' }">Bulk entry</ErpButton>
-      <ErpButton @click="formModal.openCreate()">Capture reading</ErpButton>
+      <ErpButton :to="{ name: 'MeterReadingCreate' }">Capture reading</ErpButton>
     </template>
 
     <template #kpis>
@@ -109,14 +109,6 @@
     </template>
   </WorklistLayout>
 
-  <MeterReadingFormModal
-    :open="formModal.state.open"
-    :entity-id="formModal.state.id"
-    @close="formModal.close()"
-    @saved="onSaved"
-    @edit-existing="formModal.openEdit"
-  />
-
   <ErpModal
     :open="rejectModal.open"
     title="Reject reading"
@@ -138,9 +130,7 @@ import { ref, reactive, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMeterReadings } from '@/composables/useMeterReadings'
 import { useSmartFilters } from '@/composables/useSmartFilters'
-import { useFormModal } from '@/composables/useFormModal'
 import { compactActions, viewAction, editAction } from '@/composables/useTableActions'
-import MeterReadingFormModal from '@/components/forms/MeterReadingFormModal.vue'
 import {
   WorklistLayout,
   SmartFilterBar,
@@ -159,7 +149,6 @@ import { useConfirm } from '@/composables/useConfirm'
 const route = useRoute()
 const router = useRouter()
 const { confirm } = useConfirm()
-const formModal = useFormModal()
 const approving = ref(null)
 const bulkApproving = ref(false)
 const selectedIds = ref([])
@@ -197,7 +186,7 @@ function readingActions(row) {
   const busy = approving.value === row.id
   return compactActions([
     viewAction('MeterReadingShow', row.id),
-    row.controls?.can_edit !== false && editAction(() => formModal.openEdit(row.id)),
+    row.controls?.can_edit !== false && editAction(() => router.push({ name: 'MeterReadingEdit', params: { id: row.id } })),
     status !== 'approved' && {
       key: 'approve',
       label: 'Approve',
@@ -295,13 +284,8 @@ function formatReading(val) {
   return Number(val).toLocaleString(undefined, { maximumFractionDigits: 4 })
 }
 
-async function onSaved() {
-  await fetchList(meta.value.current_page)
-}
-
 onMounted(() => {
   bindRoute(route, router, { debounceMs: 300 })
-  formModal.syncFromRoute(route, router)
   fetchList()
 })
 </script>

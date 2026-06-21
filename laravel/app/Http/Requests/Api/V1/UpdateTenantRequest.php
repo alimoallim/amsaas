@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\Tenant;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -13,14 +14,10 @@ class UpdateTenantRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        /*
-        |--------------------------------------------------------------------------
-        | Tenant Isolation
-        |--------------------------------------------------------------------------
-        */
+        $tenant = $this->route('tenant');
 
-        return $this->tenant->company_id
-            === $this->user()->company_id;
+        return $tenant instanceof Tenant
+            && ($this->user()?->can('update', $tenant) ?? false);
     }
 
     /**
